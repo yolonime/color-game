@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: color-game
+    name: color-guesser
     runtime: docker
     plan: starter
     autoDeploy: true
