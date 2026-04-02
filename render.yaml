@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: color-game
+    runtime: docker
+    plan: starter
+    autoDeploy: true
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATA_DIR
+        value: /data
+    disk:
+      name: color-game-data
+      mountPath: /data
+      sizeGB: 1

@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Color Guesser - Mode Memoire</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="bg-shape bg-shape-a"></div>
+  <div class="bg-shape bg-shape-b"></div>
+
+  <main class="app">
+    <header class="hero">
+      <button id="burgerBtn" class="burger-btn" type="button" aria-expanded="false" aria-controls="menuDrawer" aria-label="Ouvrir le menu">
+        <span class="burger-icon" aria-hidden="true">
+          <span></span>
+          <span></span>
+          <span></span>
+        </span>
+        <span class="burger-label">Menu</span>
+      </button>
+      <button id="trophyBtn" class="trophy-btn" type="button" aria-expanded="false" aria-controls="scoreDrawer" aria-label="Ouvrir les scores">
+        <span class="trophy-icon" aria-hidden="true">🏆</span>
+        <span class="trophy-label">Scores</span>
+      </button>
+      <p id="modeEyebrow" class="eyebrow">Mode 1</p>
+      <h1 id="brandTitle" class="brand-title" role="button" tabindex="0" aria-pressed="false">Color Guesser</h1>
+      <p id="heroSubtitle" class="subtitle">Observe la couleur pendant 5 secondes, puis recree-la avec les curseurs.</p>
+      <div class="hero-cta-panel">
+        <p id="heroCtaTitle" class="hero-cta-title">Defi memoire chromatique</p>
+        <p id="heroCtaSubtitle" class="hero-cta-subtitle">Partie rapide en 5 manches. Plus tu es precis, plus ton score grimpe.</p>
+        <div class="hero-actions">
+          <button id="quickStartBtn" class="btn btn-primary quick-start-btn" type="button">Commencer la partie</button>
+          <span class="hero-chip">5 manches</span>
+          <span class="hero-chip">Score precision</span>
+          <span id="nameDifficultyChip" class="hero-chip hidden">Difficulte: Normal</span>
+          <span id="codeFormatChip" class="hero-chip hidden">Code: Auto</span>
+        </div>
+      </div>
+    </header>
+
+    <div id="menuBackdrop" class="menu-backdrop hidden" aria-hidden="true"></div>
+
+    <aside id="menuDrawer" class="menu-drawer hidden" aria-label="Menu du jeu">
+      <div class="menu-head">
+        <div>
+          <p class="menu-eyebrow">Game Menu</p>
+          <h2>Sélection du mode</h2>
+        </div>
+        <button id="menuCloseBtn" class="menu-close-btn" type="button" aria-label="Fermer le menu">×</button>
+      </div>
+      <p class="menu-hint">Choisis un mode local ou passe en ligne depuis la même fenêtre.</p>
+
+      <div class="menu-section">
+        <p class="menu-section-title">Modes locaux</p>
+        <div class="mode-switch" aria-label="Choix du mode local">
+          <button id="soloModeBtn" class="mode-btn active" type="button">Mémoire</button>
+          <button id="nameModeBtn" class="mode-btn" type="button">Nom couleur</button>
+          <button id="codeModeBtn" class="mode-btn" type="button">Mode code</button>
+        </div>
+      </div>
+
+      <div id="nameDifficultySection" class="menu-section hidden">
+        <p class="menu-section-title">Difficulte nom couleur</p>
+        <div class="difficulty-switch" aria-label="Choix difficulte nom couleur">
+          <button id="difficultyEasyBtn" class="difficulty-btn" type="button">Facile</button>
+          <button id="difficultyNormalBtn" class="difficulty-btn active" type="button">Normal</button>
+          <button id="difficultyExpertBtn" class="difficulty-btn" type="button">Expert</button>
+        </div>
+      </div>
+
+      <div id="codeFormatSection" class="menu-section hidden">
+        <p class="menu-section-title">Type de code couleur</p>
+        <div class="code-format-switch" aria-label="Choix format code couleur">
+          <button id="codeFormatAutoBtn" class="code-format-btn active" type="button">Auto</button>
+          <button id="codeFormatHexBtn" class="code-format-btn" type="button">HEX</button>
+          <button id="codeFormatRgbBtn" class="code-format-btn" type="button">RGB</button>
+          <button id="codeFormatHslBtn" class="code-format-btn" type="button">HSL</button>
+        </div>
+      </div>
+
+      <div class="menu-section auth-section">
+        <p class="menu-section-title">Compte</p>
+        <div class="auth-panel">
+          <label for="authUsernameInput">Pseudo</label>
+          <input id="authUsernameInput" type="text" maxlength="20" placeholder="Ton pseudo" />
+
+          <label for="authPasswordInput">Mot de passe</label>
+          <input id="authPasswordInput" type="password" maxlength="128" placeholder="Au moins 6 caracteres" />
+
+          <div class="auth-actions">
+            <button id="registerBtn" class="btn btn-ghost" type="button">Creer compte</button>
+            <button id="loginBtn" class="btn btn-primary" type="button">Connexion</button>
+            <button id="logoutBtn" class="btn btn-ghost hidden" type="button">Deconnexion</button>
+          </div>
+
+          <p id="authStatus" class="auth-status">Non connecte.</p>
+        </div>
+      </div>
+
+      <div class="menu-section menu-online-section">
+        <p class="menu-section-title">Partie en ligne</p>
+        <button id="onlineModeBtn" class="btn btn-ghost menu-online-btn" type="button">Passer en ligne</button>
+        <p class="menu-online-note">Active le mode en ligne pour rejoindre ou créer un salon.</p>
+      </div>
+
+      <div class="menu-actions">
+        <button id="menuStartOnlineMatchBtn" class="btn btn-ghost" type="button" disabled>Lancer la partie online (5 manches)</button>
+      </div>
+    </aside>
+
+    <div id="scoreBackdrop" class="menu-backdrop hidden" aria-hidden="true"></div>
+
+    <aside id="scoreDrawer" class="score-drawer hidden" aria-label="Pages de score">
+      <div class="menu-head">
+        <div>
+          <p class="menu-eyebrow">Score Hub</p>
+          <h2>Classements</h2>
+        </div>
+        <button id="scoreCloseBtn" class="menu-close-btn" type="button" aria-label="Fermer les scores">×</button>
+      </div>
+      <p class="menu-hint">Navigue entre tes stats, tes amis et un classement global.</p>
+
+      <div class="score-tab-switch" aria-label="Pages de score">
+        <button id="scoreTabPersoBtn" class="score-tab-btn active" type="button">Perso</button>
+        <button id="scoreTabFriendsBtn" class="score-tab-btn" type="button">Ami</button>
+        <button id="scoreTabGlobalBtn" class="score-tab-btn" type="button">Global</button>
+      </div>
+
+      <section id="scorePagePerso" class="score-page"></section>
+      <section id="scorePageFriends" class="score-page hidden"></section>
+      <section id="scorePageGlobal" class="score-page hidden"></section>
+    </aside>
+
+    <section id="onlinePanel" class="online-panel hidden" aria-live="polite">
+      <div class="online-grid">
+        <div class="online-card">
+          <h2>Salon</h2>
+          <label for="playerNameInput">Pseudo</label>
+          <input id="playerNameInput" type="text" maxlength="20" placeholder="Ex: Joueur1" />
+
+          <label for="roomCodeInput">Code du salon</label>
+          <input id="roomCodeInput" type="text" maxlength="6" placeholder="AB12CD" />
+
+          <div class="actions">
+            <button id="createRoomBtn" class="btn btn-primary" type="button">Creer</button>
+            <button id="joinRoomBtn" class="btn btn-ghost" type="button">Rejoindre</button>
+          </div>
+
+          <p id="onlineStatus" class="online-status">Connecte-toi a un salon pour jouer en ligne.</p>
+          <p id="roomInfo" class="room-info"></p>
+        </div>
+
+        <div class="online-card">
+          <h2>Joueurs</h2>
+          <ul id="playersList" class="players-list"></ul>
+          <h2>Classement</h2>
+          <ol id="leaderboardList" class="leaderboard-list"></ol>
+        </div>
+      </div>
+    </section>
+
+    <section id="gameSection" class="game-card app-section">
+      <div class="stage-wrap">
+        <div id="stageColor" class="stage-color"></div>
+        <div id="stageOverlay" class="stage-overlay">Ouvre le menu pour lancer une partie</div>
+        <div id="countdown" class="countdown"></div>
+      </div>
+
+      <div class="controls">
+        <div class="slider-group">
+          <label for="hueSlider">Couleur (teinte)</label>
+          <input id="hueSlider" type="range" min="0" max="360" value="180" disabled />
+          <div id="hueImpactBar" class="slider-impact" aria-hidden="true"></div>
+          <output id="hueValue">180</output>
+        </div>
+
+        <div class="slider-group">
+          <label for="tintSlider">Teinture (saturation)</label>
+          <input id="tintSlider" type="range" min="0" max="100" value="60" disabled />
+          <div id="tintImpactBar" class="slider-impact" aria-hidden="true"></div>
+          <output id="tintValue">60%</output>
+        </div>
+
+        <div class="slider-group">
+          <label for="lightnessSlider">Luminosité</label>
+          <input id="lightnessSlider" type="range" min="0" max="100" value="50" disabled />
+          <div id="lightnessImpactBar" class="slider-impact" aria-hidden="true"></div>
+          <output id="lightnessValue">50%</output>
+        </div>
+
+        <div class="preview-wrap">
+          <p>Apercu joueur</p>
+          <div id="playerPreview" class="player-preview"></div>
+        </div>
+
+        <div id="codeFormatInlineSection" class="inline-config-block hidden">
+          <p class="inline-config-title">Type de code (mode code)</p>
+          <div class="code-format-switch" aria-label="Choix format code couleur dans la zone de jeu">
+            <button id="inlineCodeFormatAutoBtn" class="code-format-btn active" type="button">Auto</button>
+            <button id="inlineCodeFormatHexBtn" class="code-format-btn" type="button">HEX</button>
+            <button id="inlineCodeFormatRgbBtn" class="code-format-btn" type="button">RGB</button>
+            <button id="inlineCodeFormatHslBtn" class="code-format-btn" type="button">HSL</button>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="submitBtn" class="btn btn-ghost" disabled>Valider ma couleur</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="converterSection" class="converter-card app-section hidden" aria-live="polite">
+      <h2>Convertisseur couleur graphiste</h2>
+      <p class="converter-subtitle">Convertis instantanement entre HEX, RGB et HSL avec un nom de couleur suggere.</p>
+
+      <div class="converter-grid">
+        <div class="converter-preview-panel">
+          <label for="converterColorPicker">Selection visuelle</label>
+          <input id="converterColorPicker" class="converter-picker" type="color" value="#40A0D0" />
+          <div id="converterPreviewSwatch" class="converter-preview-swatch"></div>
+          <p id="converterNameText" class="converter-name">Nom suggere: -</p>
+          <p id="converterHintText" class="converter-hint">Pret.</p>
+
+          <div class="converter-gauges">
+            <p class="converter-gauges-title">Jauges HSL</p>
+
+            <div class="converter-gauge-group">
+              <label for="converterHueSlider">Teinte</label>
+              <input id="converterHueSlider" type="range" min="0" max="360" value="200" />
+              <div id="converterHueImpactBar" class="slider-impact" aria-hidden="true"></div>
+              <output id="converterHueValue">200</output>
+            </div>
+
+            <div class="converter-gauge-group">
+              <label for="converterSaturationSlider">Saturation</label>
+              <input id="converterSaturationSlider" type="range" min="0" max="100" value="60" />
+              <div id="converterSaturationImpactBar" class="slider-impact" aria-hidden="true"></div>
+              <output id="converterSaturationValue">60%</output>
+            </div>
+
+            <div class="converter-gauge-group">
+              <label for="converterLightnessSlider">Luminosite</label>
+              <input id="converterLightnessSlider" type="range" min="0" max="100" value="53" />
+              <div id="converterLightnessImpactBar" class="slider-impact" aria-hidden="true"></div>
+              <output id="converterLightnessValue">53%</output>
+            </div>
+          </div>
+        </div>
+
+        <div class="converter-fields">
+          <div class="converter-field-row">
+            <label for="converterHexInput">HEX</label>
+            <div class="converter-inline-row">
+              <input id="converterHexInput" type="text" value="#40A0D0" maxlength="7" />
+              <button id="copyHexBtn" class="converter-copy-btn" type="button">Copier</button>
+            </div>
+          </div>
+
+          <div class="converter-field-row">
+            <label>RGB</label>
+            <div class="converter-inline-row">
+              <div class="triple-inputs">
+                <input id="converterRInput" type="number" min="0" max="255" value="64" />
+                <input id="converterGInput" type="number" min="0" max="255" value="160" />
+                <input id="converterBInput" type="number" min="0" max="255" value="208" />
+              </div>
+              <button id="copyRgbBtn" class="converter-copy-btn" type="button">Copier</button>
+            </div>
+          </div>
+
+          <div class="converter-field-row">
+            <label>HSL</label>
+            <div class="converter-inline-row">
+              <div class="triple-inputs">
+                <input id="converterHInput" type="number" min="0" max="360" value="200" />
+                <input id="converterSInput" type="number" min="0" max="100" value="60" />
+                <input id="converterLInput" type="number" min="0" max="100" value="53" />
+              </div>
+              <button id="copyHslBtn" class="converter-copy-btn" type="button">Copier</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="result" class="result hidden" aria-live="polite">
+      <h2>Resultat</h2>
+      <p id="colorNameText" class="color-name-text hidden"></p>
+      <p id="scoreText" class="score-text"></p>
+      <div class="round-history-block">
+        <p class="compare-label">Recap des 5 manches</p>
+        <ol id="roundHistoryList" class="round-history-list"></ol>
+      </div>
+      <div class="compare-grid">
+        <div>
+          <p id="targetLabel" class="compare-label">Couleur cible</p>
+          <div id="targetSwatch" class="swatch"></div>
+        </div>
+        <div>
+          <p id="guessLabel" class="compare-label">Votre choix</p>
+          <div id="guessSwatch" class="swatch"></div>
+        </div>
+      </div>
+      <p id="detailText" class="detail-text"></p>
+    </section>
+  </main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
