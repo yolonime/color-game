@@ -2131,7 +2131,7 @@ if (socket) {
     onlineMode = ["memory", "name", "code"].includes(state.mode) ? state.mode : onlineMode;
     onlineCodeFormat = ["auto", "hex", "rgb", "hsl"].includes(state.codeFormat) ? state.codeFormat : onlineCodeFormat;
 
-  updateOnlineRoomUi();
+    updateOnlineRoomUi();
     renderPlayers(state.players);
     updateOnlineModeUi();
     updateModeCopy();
@@ -2408,6 +2408,8 @@ onlineModeBtn.addEventListener("click", () => {
   setGameMode("online");
   updateResultLabels();
   updateAppView();
+  onlinePanel.classList.remove("hidden");
+  onlinePanel.scrollIntoView({ block: "start", behavior: "smooth" });
   updateOnlineRoomUi();
   closeMenu();
 
