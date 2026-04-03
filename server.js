@@ -688,6 +688,20 @@ app.post("/api/auth/logout", (req, res) => {
   res.json({ ok: true });
 });
 
+app.get("/api/named-colors", (req, res) => {
+  const DIFFICULTY_VARIANTS = {
+    easy: ["base"],
+    normal: ["base", "clair", "profond"],
+    expert: ["base", "clair", "profond", "vif", "fume"],
+  };
+  
+  res.json({
+    bases: NAMED_COLOR_BASES,
+    variants: NAMED_COLOR_VARIANTS,
+    difficulties: DIFFICULTY_VARIANTS,
+  });
+});
+
 app.use(express.static(path.join(__dirname)));
 
 io.on("connection", (socket) => {

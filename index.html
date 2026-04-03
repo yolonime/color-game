@@ -219,6 +219,20 @@
           <div id="playerPreview" class="player-preview"></div>
         </div>
 
+        <div id="guessCodeSection" class="guess-code-section">
+          <label for="guessCodeInput">Ou entre un code couleur (HEX, RGB ou HSL)</label>
+          <input
+            id="guessCodeInput"
+            class="guess-code-input"
+            type="text"
+            placeholder="#40A0D0 ou rgb(64,160,208)"
+            autocomplete="off"
+            spellcheck="false"
+            disabled
+          />
+          <p id="guessCodeHint" class="guess-code-hint">Format accepte: #RRGGBB, rgb(r,g,b), hsl(h,s%,l%).</p>
+        </div>
+
         <div id="codeFormatInlineSection" class="inline-config-block hidden">
           <p class="inline-config-title">Type de code (mode code)</p>
           <div class="code-format-switch" aria-label="Choix format code couleur dans la zone de jeu">

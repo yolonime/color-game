@@ -17,6 +17,9 @@ const hueImpactBar = document.getElementById("hueImpactBar");
 const tintImpactBar = document.getElementById("tintImpactBar");
 const lightnessImpactBar = document.getElementById("lightnessImpactBar");
 const playerPreview = document.getElementById("playerPreview");
+const guessCodeSection = document.getElementById("guessCodeSection");
+const guessCodeInput = document.getElementById("guessCodeInput");
+const guessCodeHint = document.getElementById("guessCodeHint");
 const submitBtn = document.getElementById("submitBtn");
 
 const modeEyebrow = document.getElementById("modeEyebrow");
@@ -163,6 +166,7 @@ let lastSoloRandomTarget = null;
 let scorePage = "perso";
 let lastLeaderboardEntries = [];
 let isUpdatingConverter = false;
+let isUpdatingGuessCode = false;
 let appView = "game";
 let authenticatedUser = null;
 
@@ -176,71 +180,32 @@ const personalStats = {
 
 const socket = typeof io === "function" ? io() : null;
 
-const NAMED_COLOR_BASES = [
-  { name: "Corail", hue: 16, tint: 86 },
-  { name: "Saphir", hue: 217, tint: 82 },
-  { name: "Menthe", hue: 156, tint: 64 },
-  { name: "Miel", hue: 43, tint: 92 },
-  { name: "Violet", hue: 275, tint: 70 },
-  { name: "Lagune", hue: 190, tint: 75 },
-  { name: "Pistache", hue: 94, tint: 68 },
-  { name: "Rubis", hue: 352, tint: 76 },
-  { name: "Amande", hue: 78, tint: 48 },
-  { name: "Tangerine", hue: 28, tint: 92 },
-  { name: "Indigo", hue: 239, tint: 64 },
-  { name: "Turquoise", hue: 175, tint: 72 },
-  { name: "Cramoisi", hue: 348, tint: 73 },
-  { name: "Cerise", hue: 356, tint: 82 },
-  { name: "Framboise", hue: 337, tint: 78 },
-  { name: "Bordeaux", hue: 344, tint: 56 },
-  { name: "Magenta", hue: 320, tint: 84 },
-  { name: "Fuchsia", hue: 309, tint: 79 },
-  { name: "Prune", hue: 291, tint: 53 },
-  { name: "Amethyste", hue: 278, tint: 68 },
-  { name: "Lavande", hue: 263, tint: 58 },
-  { name: "Mauve", hue: 284, tint: 45 },
-  { name: "Ultramarine", hue: 231, tint: 82 },
-  { name: "Cobalt", hue: 223, tint: 74 },
-  { name: "Bleu acier", hue: 208, tint: 46 },
-  { name: "Bleu glacier", hue: 199, tint: 62 },
-  { name: "Azur", hue: 204, tint: 92 },
-  { name: "Ocean", hue: 197, tint: 68 },
-  { name: "Petrole", hue: 188, tint: 57 },
-  { name: "Canard", hue: 181, tint: 49 },
-  { name: "Emeraude", hue: 147, tint: 74 },
-  { name: "Jade", hue: 141, tint: 58 },
-  { name: "Foret", hue: 123, tint: 52 },
-  { name: "Sauge", hue: 112, tint: 34 },
-  { name: "Olive", hue: 83, tint: 45 },
-  { name: "Citron vert", hue: 96, tint: 78 },
-  { name: "Citron", hue: 58, tint: 84 },
-  { name: "Or", hue: 48, tint: 86 },
-  { name: "Ocre", hue: 39, tint: 61 },
-  { name: "Ambre", hue: 35, tint: 88 },
-  { name: "Caramel", hue: 26, tint: 59 },
-  { name: "Cuivre", hue: 22, tint: 66 },
-  { name: "Terracotta", hue: 15, tint: 58 },
-  { name: "Saumon", hue: 8, tint: 78 },
-  { name: "Poudre", hue: 350, tint: 38 },
-  { name: "Peche", hue: 23, tint: 80 },
-  { name: "Rose pastel", hue: 333, tint: 47 },
-  { name: "Rose vif", hue: 343, tint: 88 },
-  { name: "Sable", hue: 36, tint: 32 },
-  { name: "Beige", hue: 41, tint: 28 },
-  { name: "Ivoire", hue: 52, tint: 24 },
-  { name: "Ardoise", hue: 216, tint: 18 },
-  { name: "Graphite", hue: 225, tint: 10 },
-  { name: "Brume", hue: 206, tint: 16 },
-  { name: "Perle", hue: 198, tint: 20 },
-];
+let NAMED_COLOR_BASES = [];
+let NAMED_COLOR_VARIANTS = [];
 
-const NAMED_COLOR_VARIANTS = [
-  { id: "base", label: "", hueOffset: 0, tintOffset: 0 },
-  { id: "clair", label: " clair", hueOffset: 2, tintOffset: -12 },
-  { id: "profond", label: " profond", hueOffset: -2, tintOffset: 10 },
-  { id: "vif", label: " vif", hueOffset: 0, tintOffset: 14 },
-  { id: "fume", label: " fume", hueOffset: -4, tintOffset: -16 },
-];
+async function loadNamedColorData() {
+  try {
+    const response = await fetch("/api/named-colors");
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const data = await response.json();
+    NAMED_COLOR_BASES = data.bases || [];
+    NAMED_COLOR_VARIANTS = data.variants || [];
+    
+    // Mettre à jour les difficultés avec les données du serveur
+    if (data.difficulties) {
+      NAME_DIFFICULTY_VARIANTS.easy = data.difficulties.easy || NAME_DIFFICULTY_VARIANTS.easy;
+      NAME_DIFFICULTY_VARIANTS.normal = data.difficulties.normal || NAME_DIFFICULTY_VARIANTS.normal;
+      NAME_DIFFICULTY_VARIANTS.expert = data.difficulties.expert || NAME_DIFFICULTY_VARIANTS.expert;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error("Failed to load color data from API:", error);
+    return false;
+  }
+}
 
 const NAME_DIFFICULTY_VARIANTS = {
   easy: ["base"],
@@ -320,6 +285,141 @@ function hslToRgb(h, s, l) {
 function rgbToHex({ r, g, b }) {
   const toHex = (n) => Math.max(0, Math.min(255, n)).toString(16).padStart(2, "0").toUpperCase();
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+function parseRgbText(value) {
+  const match = String(value || "").trim().match(/^rgb\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$/i);
+  if (!match) {
+    return null;
+  }
+
+  const r = Number(match[1]);
+  const g = Number(match[2]);
+  const b = Number(match[3]);
+  if ([r, g, b].some((n) => n < 0 || n > 255)) {
+    return null;
+  }
+
+  return { r, g, b };
+}
+
+function parseHslText(value) {
+  const match = String(value || "").trim().match(/^hsl\(\s*(-?\d{1,3}(?:\.\d+)?)\s*,\s*(\d{1,3}(?:\.\d+)?)%\s*,\s*(\d{1,3}(?:\.\d+)?)%\s*\)$/i);
+  if (!match) {
+    return null;
+  }
+
+  const hue = Number(match[1]);
+  const saturation = Number(match[2]);
+  const lightness = Number(match[3]);
+
+  if (Number.isNaN(hue) || Number.isNaN(saturation) || Number.isNaN(lightness)) {
+    return null;
+  }
+  if (saturation < 0 || saturation > 100 || lightness < 0 || lightness > 100) {
+    return null;
+  }
+
+  return {
+    hue: wrapHue(Math.round(hue)),
+    tint: clamp(Math.round(saturation), 0, 100),
+    lightness: clamp(Math.round(lightness), 0, 100),
+  };
+}
+
+function parseColorCodeInput(value) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return null;
+  }
+
+  const rgbFromHex = hexToRgb(raw);
+  if (rgbFromHex) {
+    const hslValue = rgbToHsl(rgbFromHex.r, rgbFromHex.g, rgbFromHex.b);
+    return {
+      hue: hslValue.h,
+      tint: hslValue.s,
+      lightness: hslValue.l,
+    };
+  }
+
+  const rgbText = parseRgbText(raw);
+  if (rgbText) {
+    const hslValue = rgbToHsl(rgbText.r, rgbText.g, rgbText.b);
+    return {
+      hue: hslValue.h,
+      tint: hslValue.s,
+      lightness: hslValue.l,
+    };
+  }
+
+  return parseHslText(raw);
+}
+
+function isCodeInputAllowedInCurrentMode() {
+  if (gameMode === "online") {
+    return onlineMode !== "code";
+  }
+
+  return localMode !== "code";
+}
+
+function updateGuessCodeUi() {
+  if (!guessCodeSection || !guessCodeHint) {
+    return;
+  }
+
+  const showCodeInput = appView === "game" && isCodeInputAllowedInCurrentMode();
+  guessCodeSection.classList.toggle("hidden", !showCodeInput);
+  guessCodeSection.style.display = showCodeInput ? "grid" : "none";
+
+  if (!showCodeInput) {
+    guessCodeHint.textContent = "Format accepte: #RRGGBB, rgb(r,g,b), hsl(h,s%,l%).";
+    guessCodeHint.classList.remove("invalid");
+  }
+}
+
+function syncGuessCodeFromSliders() {
+  if (!guessCodeInput || !guessCodeSection || !guessCodeHint) {
+    return;
+  }
+  if (isUpdatingGuessCode || guessCodeSection.classList.contains("hidden")) {
+    return;
+  }
+
+  const rgb = hslToRgb(Number(hueSlider.value), Number(tintSlider.value), Number(lightnessSlider.value));
+  isUpdatingGuessCode = true;
+  guessCodeInput.value = rgbToHex(rgb);
+  guessCodeHint.textContent = "Format accepte: #RRGGBB, rgb(r,g,b), hsl(h,s%,l%).";
+  guessCodeHint.classList.remove("invalid");
+  isUpdatingGuessCode = false;
+}
+
+function applyGuessCodeInput() {
+  if (!guessCodeInput || !guessCodeSection || !guessCodeHint) {
+    return;
+  }
+  if (isUpdatingGuessCode || guessCodeInput.disabled || guessCodeSection.classList.contains("hidden")) {
+    return;
+  }
+
+  const parsed = parseColorCodeInput(guessCodeInput.value);
+  if (!parsed) {
+    guessCodeHint.textContent = "Code invalide. Exemples: #40A0D0, rgb(64,160,208), hsl(200,60%,53%).";
+    guessCodeHint.classList.add("invalid");
+    return;
+  }
+
+  isUpdatingGuessCode = true;
+  hueSlider.value = String(parsed.hue);
+  tintSlider.value = String(parsed.tint);
+  lightnessSlider.value = String(parsed.lightness);
+  isUpdatingGuessCode = false;
+
+  guessCodeInput.value = rgbToHex(hslToRgb(parsed.hue, parsed.tint, parsed.lightness));
+  guessCodeHint.textContent = "Code applique a la couleur courante.";
+  guessCodeHint.classList.remove("invalid");
+  updatePlayerPreview();
 }
 
 function hexToRgb(hex) {
@@ -866,7 +966,7 @@ function createRandomTarget(previousColor) {
   for (let attempt = 0; attempt < 16; attempt += 1) {
     const next = {
       hue: randomInt(0, 359),
-      tint: randomInt(4, 98),
+      tint: randomInt(25, 98),
       lightness: randomInt(22, 78),
     };
 
@@ -892,7 +992,7 @@ function buildNamedColors(difficulty) {
       generated.push({
         name: `${baseColor.name}${variant.label}`,
         hue: wrapHue(baseColor.hue + variant.hueOffset),
-        tint: clamp(baseColor.tint + variant.tintOffset, 12, 96),
+        tint: clamp(baseColor.tint + variant.tintOffset, 25, 96),
         lightness: FIXED_LIGHTNESS,
       });
     }
@@ -1167,10 +1267,34 @@ function updateNameDifficultyUi() {
   inlineCodeFormatHslBtn.classList.toggle("active", codeModeFormat === "hsl");
 }
 
+function nudgeSliderValue(slider, delta) {
+  if (!slider || slider.disabled) {
+    return;
+  }
+  const min = Number(slider.min || 0);
+  const max = Number(slider.max || 100);
+  const next = clamp(Number(slider.value) + delta, min, max);
+  slider.value = String(next);
+  updatePlayerPreview();
+}
+
+function wheelNudgeSlider(event, slider, normalStep, fastStep) {
+  if (!slider || slider.disabled) {
+    return;
+  }
+  event.preventDefault();
+  const amount = event.shiftKey ? fastStep : normalStep;
+  const direction = event.deltaY > 0 ? -1 : 1;
+  nudgeSliderValue(slider, direction * amount);
+}
+
 function setSlidersEnabled(isEnabled) {
   hueSlider.disabled = !isEnabled;
   tintSlider.disabled = !isEnabled;
   lightnessSlider.disabled = !isEnabled;
+  if (guessCodeInput) {
+    guessCodeInput.disabled = !isEnabled;
+  }
   submitBtn.disabled = !isEnabled || (gameMode === "online" && hasSubmittedOnline);
 }
 
@@ -1192,6 +1316,7 @@ function updateModeCopy() {
     setTheme();
     updateSelectedModeButtons();
     updateNameDifficultyUi();
+    updateGuessCodeUi();
     return;
   }
 
@@ -1207,6 +1332,7 @@ function updateModeCopy() {
   updateSelectedModeButtons();
   updateNameDifficultyUi();
   updateOnlineModeUi();
+  updateGuessCodeUi();
 }
 
 function updateAppView() {
@@ -1224,6 +1350,7 @@ function updateAppView() {
   document.body.dataset.view = isGameView ? "game" : "converter";
 
   updateModeCopy();
+  updateGuessCodeUi();
 
   if (!isGameView) {
     closeMenu();
@@ -1248,6 +1375,8 @@ function updateResultLabels() {
 }
 
 function renderStageIntro() {
+  updateGuessCodeUi();
+
   if (gameMode === "online") {
     stageOverlay.classList.remove("passive");
     stageOverlay.textContent = getOnlineModeConfig().stageIntro;
@@ -1299,6 +1428,7 @@ function setGameMode(nextMode) {
   updateModeCopy();
   updateMenuButtons();
   updateOnlineModeUi();
+  updateGuessCodeUi();
 
   if (appView === "game") {
     onlinePanel.classList.toggle("hidden", gameMode !== "online");
@@ -1329,6 +1459,7 @@ function setLocalMode(nextLocalMode) {
   setGameMode("solo");
   updateResultLabels();
   updateMenuButtons();
+  updateGuessCodeUi();
 }
 
 function setNameModeDifficulty(nextDifficulty) {
@@ -1502,6 +1633,7 @@ function updatePlayerPreview() {
   lightnessValue.textContent = `${l}%`;
   updateSliderImpactBars(h, s, l);
   playerPreview.style.background = hsl(h, s, l);
+  syncGuessCodeFromSliders();
 }
 
 function updateSliderImpactBars(h, s, l) {
@@ -2050,6 +2182,11 @@ quickStartBtn.addEventListener("click", () => {
 hueSlider.addEventListener("input", updatePlayerPreview);
 tintSlider.addEventListener("input", updatePlayerPreview);
 lightnessSlider.addEventListener("input", updatePlayerPreview);
+
+if (guessCodeInput) {
+  guessCodeInput.addEventListener("change", applyGuessCodeInput);
+  guessCodeInput.addEventListener("blur", applyGuessCodeInput);
+}
 submitBtn.addEventListener("click", scoreGuess);
 
 burgerBtn.addEventListener("click", toggleMenu);
@@ -2211,15 +2348,20 @@ inlineCodeFormatHslBtn.addEventListener("click", () => {
 
 updatePlayerPreview();
 setNameModeDifficulty("normal");
-setCodeModeFormat("auto");
-setScorePage("perso");
-renderScorePages();
-refreshAuthSession();
-initColorConverter();
-updateAppView();
-updateModeCopy();
-updateResultLabels();
-renderStageIntro();
-setGameMode("solo");
-updateMenuButtons();
-setTheme();
+// Initialise l'app une fois que les données de couleurs sont chargées
+(async () => {
+  await loadNamedColorData();
+  
+  setCodeModeFormat("auto");
+  setScorePage("perso");
+  renderScorePages();
+  refreshAuthSession();
+  initColorConverter();
+  updateAppView();
+  updateModeCopy();
+  updateResultLabels();
+  renderStageIntro();
+  setGameMode("solo");
+  updateMenuButtons();
+  setTheme();
+})();
