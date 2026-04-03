@@ -699,8 +699,30 @@ body[data-theme="online"] .menu-drawer {
 
 .online-status,
 .room-info {
-  margin: 0.5rem 0 0;
+  margin: 0.55rem 0 0;
   color: var(--ink-soft);
+}
+
+.room-info {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.4rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid rgba(54, 45, 34, 0.12);
+  background: rgba(255, 255, 255, 0.76);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.room-info.is-empty {
+  color: var(--ink-soft);
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.54);
+}
+
+#copyRoomCodeBtn {
+  margin-top: 0.55rem;
 }
 
 .players-list,

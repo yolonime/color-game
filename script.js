@@ -99,6 +99,7 @@ const playerNameInput = document.getElementById("playerNameInput");
 const roomCodeInput = document.getElementById("roomCodeInput");
 const createRoomBtn = document.getElementById("createRoomBtn");
 const joinRoomBtn = document.getElementById("joinRoomBtn");
+const copyRoomCodeBtn = document.getElementById("copyRoomCodeBtn");
 const onlineStatus = document.getElementById("onlineStatus");
 const roomInfo = document.getElementById("roomInfo");
 const playersList = document.getElementById("playersList");
@@ -1133,6 +1134,32 @@ function updateOnlineModeUi() {
   onlineCodeFormatHexBtn.disabled = !isHostEditor;
   onlineCodeFormatRgbBtn.disabled = !isHostEditor;
   onlineCodeFormatHslBtn.disabled = !isHostEditor;
+
+  updateOnlineRoomUi();
+}
+
+function updateOnlineRoomUi() {
+  const hasRoom = !!currentRoomCode;
+  const isOnline = gameMode === "online";
+
+  if (!roomInfo) {
+    return;
+  }
+
+  roomInfo.classList.toggle("is-empty", !hasRoom);
+
+  if (isOnline) {
+    roomInfo.textContent = hasRoom
+      ? `Salon: ${currentRoomCode}`
+      : "Aucun salon actif. Cree ou rejoins un salon pour commencer.";
+  } else {
+    roomInfo.textContent = "Mode hors ligne actif.";
+  }
+
+  if (copyRoomCodeBtn) {
+    copyRoomCodeBtn.classList.toggle("hidden", !hasRoom || !isOnline);
+    copyRoomCodeBtn.disabled = !hasRoom || !isOnline;
+  }
 }
 
 function syncOnlineRoomMode() {
@@ -1188,6 +1215,7 @@ function leaveOnlineSession() {
   leaderboardList.innerHTML = "";
   renderScorePages();
   setOnlineStatus("Mode hors ligne.");
+  updateOnlineRoomUi();
   updateOnlineModeUi();
   updateMenuButtons();
 }
@@ -1497,6 +1525,7 @@ function setGameMode(nextMode) {
   updateModeCopy();
   updateMenuButtons();
   updateOnlineModeUi();
+  updateOnlineRoomUi();
   updateGuessCodeUi();
 
   if (appView === "game") {
@@ -2102,7 +2131,7 @@ if (socket) {
     onlineMode = ["memory", "name", "code"].includes(state.mode) ? state.mode : onlineMode;
     onlineCodeFormat = ["auto", "hex", "rgb", "hsl"].includes(state.codeFormat) ? state.codeFormat : onlineCodeFormat;
 
-    roomInfo.textContent = currentRoomCode ? `Salon: ${currentRoomCode}` : "";
+  updateOnlineRoomUi();
     renderPlayers(state.players);
     updateOnlineModeUi();
     updateModeCopy();
@@ -2183,6 +2212,21 @@ joinRoomBtn.addEventListener("click", () => {
   socket.emit("join_room", { roomCode, name: getPlayerName() });
   setOnlineStatus("Tentative de connexion au salon...");
 });
+
+if (copyRoomCodeBtn) {
+  copyRoomCodeBtn.addEventListener("click", async () => {
+    if (!currentRoomCode) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(currentRoomCode);
+      setOnlineStatus(`Code du salon copie: ${currentRoomCode}`);
+    } catch {
+      setOnlineStatus(`Copie impossible. Code du salon: ${currentRoomCode}`);
+    }
+  });
+}
 
 menuStartOnlineMatchBtn.addEventListener("click", () => {
   pulseButton(menuStartOnlineMatchBtn);
@@ -2364,6 +2408,7 @@ onlineModeBtn.addEventListener("click", () => {
   setGameMode("online");
   updateResultLabels();
   updateAppView();
+  updateOnlineRoomUi();
   closeMenu();
 
   if (!socket) {
