@@ -52,6 +52,10 @@ const quickStartBtn = document.getElementById("quickStartBtn");
 const nameDifficultyChip = document.getElementById("nameDifficultyChip");
 const codeFormatChip = document.getElementById("codeFormatChip");
 const onlineModeChip = document.getElementById("onlineModeChip");
+const heroOnlinePanel = document.getElementById("heroOnlinePanel");
+const heroOnlineStatus = document.getElementById("heroOnlineStatus");
+const heroOpenOnlinePanelBtn = document.getElementById("heroOpenOnlinePanelBtn");
+const heroCopyRoomCodeBtn = document.getElementById("heroCopyRoomCodeBtn");
 const menuBackdrop = document.getElementById("menuBackdrop");
 const menuDrawer = document.getElementById("menuDrawer");
 const menuCloseBtn = document.getElementById("menuCloseBtn");
@@ -1141,24 +1145,62 @@ function updateOnlineModeUi() {
 function updateOnlineRoomUi() {
   const hasRoom = !!currentRoomCode;
   const isOnline = gameMode === "online";
+  const isGameView = appView === "game";
+  const shouldShowHeroOnlinePanel = isOnline && isGameView;
 
   if (!roomInfo) {
     return;
   }
 
-  roomInfo.classList.toggle("is-empty", !hasRoom);
-
-  if (isOnline) {
-    roomInfo.textContent = hasRoom
-      ? `Salon: ${currentRoomCode}`
-      : "Aucun salon actif. Cree ou rejoins un salon pour commencer.";
-  } else {
-    roomInfo.textContent = "Mode hors ligne actif.";
+  if (!isOnline) {
+    roomInfo.textContent = "";
+    roomInfo.classList.add("is-empty");
+    roomInfo.setAttribute("aria-hidden", "true");
+    if (copyRoomCodeBtn) {
+      copyRoomCodeBtn.classList.add("hidden");
+      copyRoomCodeBtn.disabled = true;
+    }
+    if (heroOnlinePanel) {
+      heroOnlinePanel.classList.add("hidden");
+      heroOnlinePanel.style.display = "none";
+      heroOnlinePanel.setAttribute("aria-hidden", "true");
+    }
+    if (heroOnlineStatus) {
+      heroOnlineStatus.textContent = "Passe en ligne pour créer ou rejoindre un salon.";
+    }
+    if (heroCopyRoomCodeBtn) {
+      heroCopyRoomCodeBtn.classList.add("hidden");
+      heroCopyRoomCodeBtn.disabled = true;
+    }
+    return;
   }
 
+  roomInfo.classList.remove("is-empty");
+  roomInfo.textContent = hasRoom
+    ? `Salon: ${currentRoomCode}`
+    : "Aucun salon actif. Cree ou rejoins un salon pour commencer.";
+  roomInfo.setAttribute("aria-hidden", "false");
+
   if (copyRoomCodeBtn) {
-    copyRoomCodeBtn.classList.toggle("hidden", !hasRoom || !isOnline);
-    copyRoomCodeBtn.disabled = !hasRoom || !isOnline;
+    copyRoomCodeBtn.classList.toggle("hidden", !hasRoom);
+    copyRoomCodeBtn.disabled = !hasRoom;
+  }
+
+  if (heroOnlinePanel) {
+    heroOnlinePanel.classList.toggle("hidden", !shouldShowHeroOnlinePanel);
+    heroOnlinePanel.style.display = shouldShowHeroOnlinePanel ? "flex" : "none";
+    heroOnlinePanel.setAttribute("aria-hidden", String(!shouldShowHeroOnlinePanel));
+  }
+
+  if (heroOnlineStatus) {
+    heroOnlineStatus.textContent = hasRoom
+      ? `Salon actif: ${currentRoomCode}`
+      : "Aucun salon actif pour le moment.";
+  }
+
+  if (heroCopyRoomCodeBtn) {
+    heroCopyRoomCodeBtn.classList.toggle("hidden", !hasRoom || !shouldShowHeroOnlinePanel);
+    heroCopyRoomCodeBtn.disabled = !hasRoom || !shouldShowHeroOnlinePanel;
   }
 }
 
@@ -1203,14 +1245,10 @@ function leaveOnlineSession() {
 
   currentRoomCode = "";
   isHost = false;
-  hasSubmittedOnline = false;
   onlinePlayersCount = 0;
-  isOnlineMatchRunning = false;
-  onlineRoundNumber = 0;
   onlineTotalRounds = MATCH_ROUNDS;
-  onlineRoundHistory = [];
+  resetOnlineMatchState();
 
-  roomInfo.textContent = "";
   playersList.innerHTML = "";
   leaderboardList.innerHTML = "";
   renderScorePages();
@@ -1448,6 +1486,7 @@ function updateAppView() {
   updateModeCopy();
   updateGuessCodeUi();
   updateSeoMetadata();
+  updateOnlineRoomUi();
 
   if (!isGameView) {
     closeMenu();
@@ -1488,29 +1527,36 @@ function renderStageIntro() {
   countdown.textContent = "";
 }
 
-function resetCurrentMatchState() {
-  clearRoundTimers();
-
+function resetSoloMatchState() {
   isSoloMatchRunning = false;
   soloRoundNumber = 0;
   soloTotalScore = 0;
   soloRoundHistory = [];
   lastSoloRandomTarget = null;
+}
 
+function resetOnlineMatchState() {
   isOnlineMatchRunning = false;
   onlineRoundNumber = 0;
   onlineRoundHistory = [];
-
-  targetColor = null;
   hasSubmittedOnline = false;
+}
 
+function clearMatchResultUi() {
+  targetColor = null;
   result.classList.add("hidden");
   roundHistoryList.innerHTML = "";
   colorNameText.classList.add("hidden");
   colorNameText.textContent = "";
   scoreText.textContent = "";
   detailText.textContent = "";
+}
 
+function resetCurrentMatchState() {
+  clearRoundTimers();
+  resetSoloMatchState();
+  resetOnlineMatchState();
+  clearMatchResultUi();
   setSlidersEnabled(false);
   updateMenuButtons();
 }
@@ -1545,16 +1591,20 @@ function setGameMode(nextMode) {
 }
 
 function setLocalMode(nextLocalMode) {
-  const hasModeChanged = localMode !== nextLocalMode || gameMode !== "solo";
-  if (hasModeChanged) {
-    resetCurrentMatchState();
+  const switchingSoloVariant = gameMode === "solo" && localMode !== nextLocalMode;
+
+  if (gameMode === "online") {
+    leaveOnlineSession();
   }
 
-  leaveOnlineSession();
   localMode = nextLocalMode;
+  if (switchingSoloVariant) {
+    resetCurrentMatchState();
+  }
   if (localMode === "name") {
     refillNamedColorPool();
   }
+
   setGameMode("solo");
   updateResultLabels();
   updateMenuButtons();
@@ -2228,6 +2278,34 @@ if (copyRoomCodeBtn) {
   });
 }
 
+if (heroOpenOnlinePanelBtn) {
+  heroOpenOnlinePanelBtn.addEventListener("click", () => {
+    const panel = document.getElementById("onlinePanel");
+    if (panel) {
+      panel.classList.remove("hidden");
+      panel.scrollIntoView({ block: "start", behavior: "smooth" });
+    }
+    if (gameMode !== "online") {
+      setGameMode("online");
+    }
+  });
+}
+
+if (heroCopyRoomCodeBtn) {
+  heroCopyRoomCodeBtn.addEventListener("click", async () => {
+    if (!currentRoomCode) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(currentRoomCode);
+      setOnlineStatus(`Code du salon copie: ${currentRoomCode}`);
+    } catch {
+      setOnlineStatus(`Copie impossible. Code du salon: ${currentRoomCode}`);
+    }
+  });
+}
+
 menuStartOnlineMatchBtn.addEventListener("click", () => {
   pulseButton(menuStartOnlineMatchBtn);
   if (!socket || !currentRoomCode || !isHost) {
@@ -2408,9 +2486,10 @@ onlineModeBtn.addEventListener("click", () => {
   setGameMode("online");
   updateResultLabels();
   updateAppView();
-  onlinePanel.classList.remove("hidden");
-  onlinePanel.scrollIntoView({ block: "start", behavior: "smooth" });
   updateOnlineRoomUi();
+  if (heroOnlinePanel) {
+    heroOnlinePanel.scrollIntoView({ block: "center", behavior: "smooth" });
+  }
   closeMenu();
 
   if (!socket) {

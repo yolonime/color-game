@@ -463,6 +463,47 @@ body[data-theme="online"] .menu-drawer {
   flex-wrap: wrap;
 }
 
+.hero-online-panel {
+  margin: 1rem auto 0;
+  max-width: 720px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  border: 1px solid rgba(45, 86, 87, 0.18);
+  border-radius: 18px;
+  padding: 0.9rem 1rem;
+  background: linear-gradient(135deg, rgba(28, 84, 82, 0.12), rgba(255, 255, 255, 0.78));
+  box-shadow: 0 10px 24px rgba(31, 27, 22, 0.08);
+}
+
+.hero-online-eyebrow {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #31605e;
+}
+
+.hero-online-status {
+  margin: 0.22rem 0 0;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.hero-online-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.hero-online-panel .btn {
+  white-space: nowrap;
+}
+
 .quick-start-btn {
   margin: 0;
   min-width: 160px;

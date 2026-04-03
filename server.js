@@ -16,6 +16,13 @@ const MATCH_ROUNDS = 5;
 const NEXT_ROUND_DELAY_MS = 1400;
 const AUTH_COOKIE_NAME = "cg_auth";
 const AUTH_TTL_MS = 1000 * 60 * 60 * 24 * 30;
+const VALID_ONLINE_MODES = new Set(["memory", "name", "code"]);
+const VALID_CODE_FORMATS = new Set(["auto", "hex", "rgb", "hsl"]);
+const NAMED_COLOR_DIFFICULTIES = {
+  easy: ["base"],
+  normal: ["base", "clair", "profond"],
+  expert: ["base", "clair", "profond", "vif", "fume"],
+};
 
 const dataDir = process.env.DATA_DIR
   ? path.resolve(process.env.DATA_DIR)
@@ -303,6 +310,99 @@ function hslDistance(target, guess) {
   const strictnessExponent = 2.2;
   const score = Math.max(0, Number((((1 - weightedDistance) ** strictnessExponent) * 100).toFixed(2)));
   return { score, hueDiff, tintDiff, lightnessDiff };
+}
+
+function normalizeOnlineMode(mode) {
+  return VALID_ONLINE_MODES.has(mode) ? mode : "memory";
+}
+
+function normalizeCodeFormat(codeFormat) {
+  return VALID_CODE_FORMATS.has(codeFormat) ? codeFormat : "auto";
+}
+
+function createPlayerState(socketId, name) {
+  return {
+    id: socketId,
+    name: (name || "Joueur").slice(0, 20),
+    submitted: false,
+    lastScore: 0,
+    totalScore: 0,
+    currentGuess: null,
+    currentResult: null,
+  };
+}
+
+function createRoomState(socketId, name, mode, codeFormat) {
+  const normalizedMode = normalizeOnlineMode(mode);
+  const normalizedCodeFormat = normalizeCodeFormat(codeFormat);
+
+  return {
+    hostId: socketId,
+    phase: "idle",
+    target: null,
+    lastRandomTarget: null,
+    lastNamedTarget: null,
+    matchActive: false,
+    roundNumber: 0,
+    maxRounds: MATCH_ROUNDS,
+    mode: normalizedMode,
+    codeFormat: normalizedMode === "code" ? normalizedCodeFormat : "auto",
+    namedColorPool: normalizedMode === "name" ? buildNamedColorPool() : [],
+    players: new Map([[socketId, createPlayerState(socketId, name)]]),
+  };
+}
+
+function resetPlayerProgress(player) {
+  player.submitted = false;
+  player.lastScore = 0;
+  player.totalScore = 0;
+  player.currentGuess = null;
+  player.currentResult = null;
+}
+
+function resetRoomForMatch(room) {
+  room.matchActive = true;
+  room.roundNumber = 0;
+  room.phase = "idle";
+  room.lastRandomTarget = null;
+  room.lastNamedTarget = null;
+  room.namedColorPool = room.mode === "name" ? buildNamedColorPool() : [];
+
+  for (const player of room.players.values()) {
+    resetPlayerProgress(player);
+  }
+}
+
+function clearRoomTimer(roomCode) {
+  const timer = roomTimers.get(roomCode);
+  if (timer) {
+    clearTimeout(timer);
+    roomTimers.delete(roomCode);
+  }
+}
+
+function removeSocketFromRoom(socket, roomCode) {
+  const room = rooms.get(roomCode);
+  if (!room) {
+    socket.data.roomCode = null;
+    return;
+  }
+
+  room.players.delete(socket.id);
+  socket.leave(roomCode);
+  socket.data.roomCode = null;
+
+  if (room.players.size === 0) {
+    clearRoomTimer(roomCode);
+    rooms.delete(roomCode);
+    return;
+  }
+
+  if (room.hostId === socket.id) {
+    room.hostId = room.players.keys().next().value;
+  }
+
+  emitRoomState(roomCode);
 }
 
 function hueCircularDiff(a, b) {
@@ -689,16 +789,10 @@ app.post("/api/auth/logout", (req, res) => {
 });
 
 app.get("/api/named-colors", (req, res) => {
-  const DIFFICULTY_VARIANTS = {
-    easy: ["base"],
-    normal: ["base", "clair", "profond"],
-    expert: ["base", "clair", "profond", "vif", "fume"],
-  };
-  
   res.json({
     bases: NAMED_COLOR_BASES,
     variants: NAMED_COLOR_VARIANTS,
-    difficulties: DIFFICULTY_VARIANTS,
+    difficulties: NAMED_COLOR_DIFFICULTIES,
   });
 });
 
@@ -711,33 +805,7 @@ io.on("connection", (socket) => {
       roomCode = makeRoomCode();
     }
 
-    const normalizedMode = ["memory", "name", "code"].includes(mode) ? mode : "memory";
-    const normalizedCodeFormat = ["auto", "hex", "rgb", "hsl"].includes(codeFormat) ? codeFormat : "auto";
-
-    const room = {
-      hostId: socket.id,
-      phase: "idle",
-      target: null,
-      lastRandomTarget: null,
-      lastNamedTarget: null,
-      matchActive: false,
-      roundNumber: 0,
-      maxRounds: MATCH_ROUNDS,
-      mode: normalizedMode,
-      codeFormat: normalizedCodeFormat,
-      namedColorPool: normalizedMode === "name" ? buildNamedColorPool() : [],
-      players: new Map(),
-    };
-
-    room.players.set(socket.id, {
-      id: socket.id,
-      name: (name || "Joueur").slice(0, 20),
-      submitted: false,
-      lastScore: 0,
-      totalScore: 0,
-      currentGuess: null,
-      currentResult: null,
-    });
+    const room = createRoomState(socket.id, name, mode, codeFormat);
 
     rooms.set(roomCode, room);
     socket.join(roomCode);
@@ -753,15 +821,7 @@ io.on("connection", (socket) => {
       return;
     }
 
-    room.players.set(socket.id, {
-      id: socket.id,
-      name: (name || "Joueur").slice(0, 20),
-      submitted: false,
-      lastScore: 0,
-      totalScore: 0,
-      currentGuess: null,
-      currentResult: null,
-    });
+    room.players.set(socket.id, createPlayerState(socket.id, name));
 
     socket.join(normalizedCode);
     socket.data.roomCode = normalizedCode;
@@ -774,31 +834,7 @@ io.on("connection", (socket) => {
       return;
     }
 
-    const room = rooms.get(roomCode);
-    if (!room) {
-      socket.data.roomCode = null;
-      return;
-    }
-
-    room.players.delete(socket.id);
-    socket.leave(roomCode);
-    socket.data.roomCode = null;
-
-    if (room.players.size === 0) {
-      const timer = roomTimers.get(roomCode);
-      if (timer) {
-        clearTimeout(timer);
-        roomTimers.delete(roomCode);
-      }
-      rooms.delete(roomCode);
-      return;
-    }
-
-    if (room.hostId === socket.id) {
-      room.hostId = room.players.keys().next().value;
-    }
-
-    emitRoomState(roomCode);
+    removeSocketFromRoom(socket, roomCode);
   });
 
   socket.on("start_match", ({ roomCode }) => {
@@ -812,23 +848,7 @@ io.on("connection", (socket) => {
       return;
     }
 
-    room.matchActive = true;
-    room.roundNumber = 0;
-    room.phase = "idle";
-    room.lastRandomTarget = null;
-    room.lastNamedTarget = null;
-
-    if (room.mode === "name") {
-      refillNamedColorPool(room);
-    }
-
-    for (const player of room.players.values()) {
-      player.submitted = false;
-      player.lastScore = 0;
-      player.totalScore = 0;
-      player.currentGuess = null;
-      player.currentResult = null;
-    }
+    resetRoomForMatch(room);
 
     io.to(roomCode).emit("match_started", { maxRounds: room.maxRounds });
     startRoomRound(roomCode);
@@ -850,8 +870,8 @@ io.on("connection", (socket) => {
       return;
     }
 
-    const normalizedMode = ["memory", "name", "code"].includes(mode) ? mode : "memory";
-    const normalizedCodeFormat = ["auto", "hex", "rgb", "hsl"].includes(codeFormat) ? codeFormat : "auto";
+    const normalizedMode = normalizeOnlineMode(mode);
+    const normalizedCodeFormat = normalizeCodeFormat(codeFormat);
 
     room.mode = normalizedMode;
     room.codeFormat = normalizedMode === "code" ? normalizedCodeFormat : "auto";
