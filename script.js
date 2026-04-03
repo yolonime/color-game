@@ -1288,6 +1288,51 @@ function wheelNudgeSlider(event, slider, normalStep, fastStep) {
   nudgeSliderValue(slider, direction * amount);
 }
 
+function updateSeoMetadata() {
+  const metaDescription = document.getElementById("metaDescription");
+  const metaOgTitle = document.getElementById("metaOgTitle");
+  const metaOgDescription = document.getElementById("metaOgDescription");
+  const metaTwitterTitle = document.getElementById("metaTwitterTitle");
+  const metaTwitterDescription = document.getElementById("metaTwitterDescription");
+
+  let title = "Color Guesser - Jeu des couleurs en ligne";
+  let description = "Joue a Color Guesser en mode memoire, nom de couleur ou code HEX/RGB/HSL, en solo ou en ligne.";
+
+  if (appView === "converter") {
+    title = "Color Helper - Convertisseur couleur HEX RGB HSL";
+    description = "Convertisseur couleur en ligne: HEX, RGB et HSL avec apercu instantane et valeurs editables.";
+  } else if (gameMode === "online") {
+    title = `Color Guesser Online - ${ONLINE_MODE_LABELS[onlineMode] || "Multijoueur"}`;
+    description = "Joue a Color Guesser en multijoueur: cree un salon, rejoins tes amis et compare vos scores en direct.";
+  } else if (localMode === "name") {
+    title = "Color Guesser - Mode Nom de couleur";
+    description = "Lis un nom de couleur puis reproduis la teinte exacte avec les curseurs pour gagner un max de points.";
+  } else if (localMode === "code") {
+    title = "Color Guesser - Mode Code HEX RGB HSL";
+    description = "Reproduis une couleur a partir d'un code HEX, RGB ou HSL et entraine ta precision colorimetrique.";
+  } else {
+    title = "Color Guesser - Mode Memoire";
+    description = "Observe la couleur, memorise-la et reproduis-la en 5 manches pour améliorer ta memoire visuelle.";
+  }
+
+  document.title = title;
+  if (metaDescription) {
+    metaDescription.setAttribute("content", description);
+  }
+  if (metaOgTitle) {
+    metaOgTitle.setAttribute("content", title);
+  }
+  if (metaOgDescription) {
+    metaOgDescription.setAttribute("content", description);
+  }
+  if (metaTwitterTitle) {
+    metaTwitterTitle.setAttribute("content", title);
+  }
+  if (metaTwitterDescription) {
+    metaTwitterDescription.setAttribute("content", description);
+  }
+}
+
 function setSlidersEnabled(isEnabled) {
   hueSlider.disabled = !isEnabled;
   tintSlider.disabled = !isEnabled;
@@ -1333,6 +1378,7 @@ function updateModeCopy() {
   updateNameDifficultyUi();
   updateOnlineModeUi();
   updateGuessCodeUi();
+  updateSeoMetadata();
 }
 
 function updateAppView() {
@@ -1346,11 +1392,11 @@ function updateAppView() {
 
   brandTitle.textContent = isGameView ? "Color Guesser" : "Color Helper";
   brandTitle.setAttribute("aria-pressed", String(!isGameView));
-  document.title = isGameView ? "Color Guesser - Mode Memoire" : "Color Helper - Convertisseur couleur";
   document.body.dataset.view = isGameView ? "game" : "converter";
 
   updateModeCopy();
   updateGuessCodeUi();
+  updateSeoMetadata();
 
   if (!isGameView) {
     closeMenu();
