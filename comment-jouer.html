@@ -36,6 +36,36 @@
       margin: 0 auto;
       padding: 1.25rem;
     }
+    .top-nav {
+      position: sticky;
+      top: 0.65rem;
+      z-index: 20;
+      margin-bottom: 0.9rem;
+    }
+    .back-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      background: var(--accent);
+      color: #fff;
+      border: 1px solid color-mix(in srgb, var(--accent) 80%, #000 20%);
+      border-radius: 999px;
+      padding: 0.62rem 1rem;
+      font-weight: 700;
+      text-decoration: none;
+      box-shadow: 0 8px 24px rgba(84, 38, 15, 0.18);
+    }
+    .back-cta:hover,
+    .back-cta:focus-visible {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 28px rgba(84, 38, 15, 0.24);
+      text-decoration: none;
+    }
+    .back-cta-note {
+      margin: 0.55rem 0 0;
+      font-size: 0.93rem;
+      color: #5f4e3d;
+    }
     .panel {
       background: var(--panel);
       border: 1px solid var(--line);
@@ -56,28 +86,28 @@
     ul {
       margin: 0.35rem 0 0.35rem 1.2rem;
     }
-    .back-link {
-      display: inline-block;
-      margin-top: 0.4rem;
-      color: #7c3f20;
-      font-weight: 700;
-      text-decoration: none;
-    }
-    .back-link:hover,
-    .back-link:focus-visible {
-      text-decoration: underline;
+    .panel-footer {
+      text-align: center;
+      margin-top: 0.25rem;
     }
   </style>
 </head>
 <body>
   <main class="wrap">
+    <div class="top-nav">
+      <a class="back-cta" href="/" aria-label="Retourner au jeu Color Guesser">
+        <span aria-hidden="true">←</span>
+        <span>Retourner au jeu maintenant</span>
+      </a>
+      <p class="back-cta-note">Tu peux revenir au jeu a tout moment, ta page est deja prete.</p>
+    </div>
+
     <article class="panel">
       <h1>Comment Jouer a Color Guesser</h1>
       <p>
         Color Guesser est un jeu de precision visuelle. Le but est de reproduire la couleur cible avec la meilleure exactitude possible
         en ajustant teinte, saturation et luminosite.
       </p>
-      <a class="back-link" href="/">Retour au jeu</a>
     </article>
 
     <section class="panel">
@@ -124,6 +154,13 @@
         <li>Evite les grands mouvements de curseur en fin d'ajustement.</li>
         <li>En mode Memoire, note mentalement si la cible est plutot vive ou desaturee.</li>
       </ul>
+    </section>
+
+    <section class="panel panel-footer">
+      <a class="back-cta" href="/" aria-label="Retourner au jeu Color Guesser">
+        <span aria-hidden="true">←</span>
+        <span>Jouer a Color Guesser</span>
+      </a>
     </section>
   </main>
 </body>
