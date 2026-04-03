@@ -768,6 +768,39 @@ io.on("connection", (socket) => {
     emitRoomState(normalizedCode);
   });
 
+  socket.on("leave_room", () => {
+    const roomCode = socket.data.roomCode;
+    if (!roomCode) {
+      return;
+    }
+
+    const room = rooms.get(roomCode);
+    if (!room) {
+      socket.data.roomCode = null;
+      return;
+    }
+
+    room.players.delete(socket.id);
+    socket.leave(roomCode);
+    socket.data.roomCode = null;
+
+    if (room.players.size === 0) {
+      const timer = roomTimers.get(roomCode);
+      if (timer) {
+        clearTimeout(timer);
+        roomTimers.delete(roomCode);
+      }
+      rooms.delete(roomCode);
+      return;
+    }
+
+    if (room.hostId === socket.id) {
+      room.hostId = room.players.keys().next().value;
+    }
+
+    emitRoomState(roomCode);
+  });
+
   socket.on("start_match", ({ roomCode }) => {
     const room = rooms.get(roomCode);
     if (!room) {

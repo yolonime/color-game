@@ -1169,6 +1169,29 @@ function setOnlineMode(nextMode, { syncRoom = true } = {}) {
   }
 }
 
+function leaveOnlineSession() {
+  if (socket && currentRoomCode) {
+    socket.emit("leave_room");
+  }
+
+  currentRoomCode = "";
+  isHost = false;
+  hasSubmittedOnline = false;
+  onlinePlayersCount = 0;
+  isOnlineMatchRunning = false;
+  onlineRoundNumber = 0;
+  onlineTotalRounds = MATCH_ROUNDS;
+  onlineRoundHistory = [];
+
+  roomInfo.textContent = "";
+  playersList.innerHTML = "";
+  leaderboardList.innerHTML = "";
+  renderScorePages();
+  setOnlineStatus("Mode hors ligne.");
+  updateOnlineModeUi();
+  updateMenuButtons();
+}
+
 function setOnlineCodeFormat(nextFormat, { syncRoom = true } = {}) {
   const normalizedFormat = ["auto", "hex", "rgb", "hsl"].includes(nextFormat) ? nextFormat : "auto";
   onlineCodeFormat = normalizedFormat;
@@ -1498,6 +1521,7 @@ function setLocalMode(nextLocalMode) {
     resetCurrentMatchState();
   }
 
+  leaveOnlineSession();
   localMode = nextLocalMode;
   if (localMode === "name") {
     refillNamedColorPool();
@@ -2330,8 +2354,18 @@ codeModeBtn.addEventListener("click", () => {
 
 onlineModeBtn.addEventListener("click", () => {
   pulseButton(onlineModeBtn);
+
+  // S'assure que le panel online peut s'afficher immediatement.
+  if (appView !== "game") {
+    appView = "game";
+    updateAppView();
+  }
+
   setGameMode("online");
   updateResultLabels();
+  updateAppView();
+  closeMenu();
+
   if (!socket) {
     setOnlineStatus("Mode online: serveur non detecte. Lance node server.js.");
   }
