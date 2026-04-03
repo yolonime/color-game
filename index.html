@@ -39,6 +39,7 @@
           <span class="hero-chip">Score precision</span>
           <span id="nameDifficultyChip" class="hero-chip hidden">Difficulte: Normal</span>
           <span id="codeFormatChip" class="hero-chip hidden">Code: Auto</span>
+          <span id="onlineModeChip" class="hero-chip hidden">Online: Memoire</span>
         </div>
       </div>
     </header>
@@ -140,6 +141,26 @@
       <div class="online-grid">
         <div class="online-card">
           <h2>Salon</h2>
+          <div class="online-mode-section">
+            <p class="menu-section-title">Mode en ligne</p>
+            <div class="mode-switch" aria-label="Choix du mode en ligne">
+              <button id="onlineMemoryModeBtn" class="mode-btn active" type="button">Mémoire</button>
+              <button id="onlineNameModeBtn" class="mode-btn" type="button">Nom couleur</button>
+              <button id="onlineCodeModeBtn" class="mode-btn" type="button">Mode code</button>
+            </div>
+            <p class="online-mode-note">Le host choisit le mode avant de lancer la partie.</p>
+          </div>
+
+          <div id="onlineCodeFormatSection" class="menu-section hidden online-code-format-section">
+            <p class="menu-section-title">Format du code</p>
+            <div class="code-format-switch" aria-label="Choix format code couleur en ligne">
+              <button id="onlineCodeFormatAutoBtn" class="code-format-btn active" type="button">Auto</button>
+              <button id="onlineCodeFormatHexBtn" class="code-format-btn" type="button">HEX</button>
+              <button id="onlineCodeFormatRgbBtn" class="code-format-btn" type="button">RGB</button>
+              <button id="onlineCodeFormatHslBtn" class="code-format-btn" type="button">HSL</button>
+            </div>
+          </div>
+
           <label for="playerNameInput">Pseudo</label>
           <input id="playerNameInput" type="text" maxlength="20" placeholder="Ex: Joueur1" />
 

@@ -3,6 +3,7 @@
 Jeu web avec 2 modes:
 - Solo: partie de 5 manches (memoriser une couleur puis la reproduire).
 - Online: partie de 5 manches en salon multijoueur temps reel avec classement cumule.
+- Le mode online peut etre lance en Memoire, Nom couleur ou Mode code.
 
 ## Prerequis
 

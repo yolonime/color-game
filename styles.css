@@ -677,6 +677,26 @@ body[data-theme="online"] .menu-drawer {
   background: rgba(255, 255, 255, 0.86);
 }
 
+.online-mode-section {
+  margin-bottom: 1rem;
+  padding-bottom: 0.9rem;
+  border-bottom: 1px solid rgba(31, 27, 22, 0.08);
+}
+
+.online-code-format-section {
+  margin-bottom: 1rem;
+}
+
+.online-mode-note {
+  margin: 0.5rem 0 0;
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+}
+
+.online-mode-chip {
+  white-space: nowrap;
+}
+
 .online-status,
 .room-info {
   margin: 0.5rem 0 0;

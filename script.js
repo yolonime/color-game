@@ -48,6 +48,7 @@ const trophyBtn = document.getElementById("trophyBtn");
 const quickStartBtn = document.getElementById("quickStartBtn");
 const nameDifficultyChip = document.getElementById("nameDifficultyChip");
 const codeFormatChip = document.getElementById("codeFormatChip");
+const onlineModeChip = document.getElementById("onlineModeChip");
 const menuBackdrop = document.getElementById("menuBackdrop");
 const menuDrawer = document.getElementById("menuDrawer");
 const menuCloseBtn = document.getElementById("menuCloseBtn");
@@ -71,6 +72,14 @@ const codeFormatAutoBtn = document.getElementById("codeFormatAutoBtn");
 const codeFormatHexBtn = document.getElementById("codeFormatHexBtn");
 const codeFormatRgbBtn = document.getElementById("codeFormatRgbBtn");
 const codeFormatHslBtn = document.getElementById("codeFormatHslBtn");
+const onlineMemoryModeBtn = document.getElementById("onlineMemoryModeBtn");
+const onlineNameModeBtn = document.getElementById("onlineNameModeBtn");
+const onlineCodeModeBtn = document.getElementById("onlineCodeModeBtn");
+const onlineCodeFormatSection = document.getElementById("onlineCodeFormatSection");
+const onlineCodeFormatAutoBtn = document.getElementById("onlineCodeFormatAutoBtn");
+const onlineCodeFormatHexBtn = document.getElementById("onlineCodeFormatHexBtn");
+const onlineCodeFormatRgbBtn = document.getElementById("onlineCodeFormatRgbBtn");
+const onlineCodeFormatHslBtn = document.getElementById("onlineCodeFormatHslBtn");
 const codeFormatInlineSection = document.getElementById("codeFormatInlineSection");
 const inlineCodeFormatAutoBtn = document.getElementById("inlineCodeFormatAutoBtn");
 const inlineCodeFormatHexBtn = document.getElementById("inlineCodeFormatHexBtn");
@@ -131,6 +140,8 @@ let gameMode = "solo";
 let localMode = "memory";
 let nameModeDifficulty = "normal";
 let codeModeFormat = "auto";
+let onlineMode = "memory";
+let onlineCodeFormat = "auto";
 
 let soloRoundNumber = 0;
 let soloTotalScore = 0;
@@ -907,8 +918,8 @@ function getNameDifficultyLabel() {
   return NAME_DIFFICULTY_LABELS[nameModeDifficulty] || NAME_DIFFICULTY_LABELS.normal;
 }
 
-function getCodeFormatLabel() {
-  return CODE_FORMAT_LABELS[codeModeFormat] || CODE_FORMAT_LABELS.auto;
+function getCodeFormatLabel(format = codeModeFormat) {
+  return CODE_FORMAT_LABELS[format] || CODE_FORMAT_LABELS.auto;
 }
 
 function pickNamedColor() {
@@ -955,6 +966,118 @@ function getLocalModeConfig() {
     stageHidden: "La couleur est cachee. Reproduis-la avec les curseurs.",
     targetLabel: "Couleur cible",
   };
+}
+
+function getOnlineModeConfig() {
+  if (onlineMode === "name") {
+    return {
+      eyebrow: "Online",
+      subtitle: "Joue en salon avec des noms de couleur a reproduire.",
+      ctaTitle: "Defi multijoueur nom couleur",
+      ctaSubtitle: "Le host lance 5 manches et tout le monde reconstruit la vraie couleur.",
+      startLabel: "Lancer la partie online",
+      stageIntro: "Observe le nom de couleur",
+      stageHidden: "Le nom a disparu. Reproduis la couleur.",
+      targetLabel: "Vraie couleur",
+    };
+  }
+
+  if (onlineMode === "code") {
+    return {
+      eyebrow: "Online",
+      subtitle: "Joue en salon avec des codes couleur a interpreter.",
+      ctaTitle: "Defi multijoueur code couleur",
+      ctaSubtitle: `Le format ${getCodeFormatLabel(onlineCodeFormat)} est partage a toute la salle.`,
+      startLabel: "Lancer la partie online",
+      stageIntro: "Observe le code couleur",
+      stageHidden: "Le code a disparu. Reproduis la couleur.",
+      targetLabel: "Vraie couleur",
+    };
+  }
+
+  return {
+    eyebrow: "Online",
+    subtitle: "Joue en salon avec un classement en temps reel.",
+    ctaTitle: "Defi multijoueur",
+    ctaSubtitle: "Rejoins un salon et affronte les autres joueurs sur 5 manches.",
+    startLabel: "Lancer la partie online",
+    stageIntro: "Observe la couleur pendant 5 secondes",
+    stageHidden: "La couleur est cachee. Reproduis-la avec les curseurs.",
+    targetLabel: "Couleur cible",
+  };
+}
+
+function updateOnlineModeUi() {
+  const isOnline = gameMode === "online";
+  const isCodeOnline = isOnline && onlineMode === "code";
+  const isHostEditor = !currentRoomCode || isHost;
+
+  onlineModeChip.classList.toggle("hidden", !isOnline);
+  onlineModeChip.textContent = `Online: ${ONLINE_MODE_LABELS[onlineMode] || ONLINE_MODE_LABELS.memory}`;
+
+  onlineMemoryModeBtn.classList.toggle("active", onlineMode === "memory");
+  onlineNameModeBtn.classList.toggle("active", onlineMode === "name");
+  onlineCodeModeBtn.classList.toggle("active", onlineMode === "code");
+
+  onlineMemoryModeBtn.disabled = !isHostEditor;
+  onlineNameModeBtn.disabled = !isHostEditor;
+  onlineCodeModeBtn.disabled = !isHostEditor;
+
+  onlineCodeFormatSection.classList.toggle("hidden", !isCodeOnline);
+  onlineCodeFormatAutoBtn.classList.toggle("active", onlineCodeFormat === "auto");
+  onlineCodeFormatHexBtn.classList.toggle("active", onlineCodeFormat === "hex");
+  onlineCodeFormatRgbBtn.classList.toggle("active", onlineCodeFormat === "rgb");
+  onlineCodeFormatHslBtn.classList.toggle("active", onlineCodeFormat === "hsl");
+
+  onlineCodeFormatAutoBtn.disabled = !isHostEditor;
+  onlineCodeFormatHexBtn.disabled = !isHostEditor;
+  onlineCodeFormatRgbBtn.disabled = !isHostEditor;
+  onlineCodeFormatHslBtn.disabled = !isHostEditor;
+}
+
+function syncOnlineRoomMode() {
+  if (!socket || !currentRoomCode || !isHost) {
+    return;
+  }
+
+  socket.emit("set_room_mode", {
+    roomCode: currentRoomCode,
+    mode: onlineMode,
+    codeFormat: onlineCodeFormat,
+  });
+}
+
+function setOnlineMode(nextMode, { syncRoom = true } = {}) {
+  const normalizedMode = ["memory", "name", "code"].includes(nextMode) ? nextMode : "memory";
+  const hasChanged = onlineMode !== normalizedMode;
+  onlineMode = normalizedMode;
+
+  if (onlineMode !== "code") {
+    onlineCodeFormat = "auto";
+  }
+
+  updateOnlineModeUi();
+  updateModeCopy();
+
+  if (hasChanged && gameMode === "online") {
+    renderStageIntro();
+    updateResultLabels();
+  }
+
+  if (syncRoom) {
+    syncOnlineRoomMode();
+  }
+}
+
+function setOnlineCodeFormat(nextFormat, { syncRoom = true } = {}) {
+  const normalizedFormat = ["auto", "hex", "rgb", "hsl"].includes(nextFormat) ? nextFormat : "auto";
+  onlineCodeFormat = normalizedFormat;
+  updateOnlineModeUi();
+  updateModeCopy();
+
+  if (syncRoom) {
+    syncOnlineRoomMode();
+  }
 }
 
 function getTargetForRound() {
@@ -1072,15 +1195,7 @@ function updateModeCopy() {
     return;
   }
 
-  const config = gameMode === "online"
-    ? {
-        eyebrow: "Online",
-        subtitle: "Joue en salon avec un classement en temps reel.",
-        ctaTitle: "Defi multijoueur",
-        ctaSubtitle: "Rejoins un salon et affronte les autres joueurs sur 5 manches.",
-        startLabel: "Lancer le mode online",
-      }
-    : getLocalModeConfig();
+  const config = gameMode === "online" ? getOnlineModeConfig() : getLocalModeConfig();
 
   modeEyebrow.textContent = config.eyebrow;
   heroSubtitle.textContent = config.subtitle;
@@ -1091,6 +1206,7 @@ function updateModeCopy() {
   setTheme();
   updateSelectedModeButtons();
   updateNameDifficultyUi();
+  updateOnlineModeUi();
 }
 
 function updateAppView() {
@@ -1117,7 +1233,7 @@ function updateAppView() {
 
 function updateResultLabels() {
   if (gameMode === "online") {
-    targetLabel.textContent = "Couleur cible";
+    targetLabel.textContent = getOnlineModeConfig().targetLabel;
     guessLabel.textContent = "Votre choix";
     colorNameText.classList.add("hidden");
     colorNameText.textContent = "";
@@ -1134,9 +1250,9 @@ function updateResultLabels() {
 function renderStageIntro() {
   if (gameMode === "online") {
     stageOverlay.classList.remove("passive");
-    stageOverlay.textContent = "En attente de manche en ligne";
+    stageOverlay.textContent = getOnlineModeConfig().stageIntro;
     stageColor.style.background = "hsl(180, 25%, 78%)";
-    countdown.textContent = "Online";
+    countdown.textContent = ONLINE_MODE_LABELS[onlineMode] || "Online";
     return;
   }
 
@@ -1182,6 +1298,7 @@ function setGameMode(nextMode) {
   gameMode = nextMode;
   updateModeCopy();
   updateMenuButtons();
+  updateOnlineModeUi();
 
   if (appView === "game") {
     onlinePanel.classList.toggle("hidden", gameMode !== "online");
@@ -1240,8 +1357,8 @@ function renderRoundHistory(rounds) {
 
     const label = document.createElement("span");
     label.className = "round-history-label";
-    label.textContent = round.name
-      ? `Manche ${round.roundNumber}: ${round.name} - ${formatScore(round.score)}/100`
+    label.textContent = round.label
+      ? `Manche ${round.roundNumber}: ${round.label} - ${formatScore(round.score)}/100`
       : `Manche ${round.roundNumber}: ${formatScore(round.score)}/100`;
 
     const swatchRow = document.createElement("div");
@@ -1523,7 +1640,7 @@ function scoreGuess() {
     score,
     target: { ...targetColor },
     guess,
-    name: targetColor.name,
+    label: targetColor.name || targetColor.code || null,
   });
 
   targetSwatch.style.background = hsl(targetColor.hue, targetColor.tint, targetColor.lightness);
@@ -1657,16 +1774,28 @@ async function refreshAuthSession() {
   }
 }
 
-function runReveal(target) {
+function runReveal(target, revealMode = gameMode === "online" ? onlineMode : localMode) {
   clearRoundTimers();
   targetColor = target;
   hasSubmittedOnline = false;
   setSlidersEnabled(false);
   updateResultLabels();
 
-  stageOverlay.classList.add("passive");
-  stageOverlay.textContent = "Memorise cette couleur";
-  stageColor.style.background = hsl(target.hue, target.tint, target.lightness);
+  const revealConfig = gameMode === "online" ? getOnlineModeConfig() : getLocalModeConfig();
+
+  if (revealMode === "name") {
+    stageOverlay.classList.remove("passive");
+    stageOverlay.innerHTML = `<div class="name-mode-card"><span>Nom couleur</span><strong>${target.name}</strong></div>`;
+    stageColor.style.background = "linear-gradient(135deg, rgba(34,31,27,0.98), rgba(67,58,50,0.95))";
+  } else if (revealMode === "code") {
+    stageOverlay.classList.remove("passive");
+    stageOverlay.innerHTML = `<div class="name-mode-card"><span>${target.codeFormat || getCodeFormatLabel(onlineCodeFormat)}</span><strong>${target.code}</strong></div>`;
+    stageColor.style.background = "linear-gradient(135deg, rgba(16,23,34,0.98), rgba(32,52,78,0.95))";
+  } else {
+    stageOverlay.classList.add("passive");
+    stageOverlay.textContent = "Memorise cette couleur";
+    stageColor.style.background = hsl(target.hue, target.tint, target.lightness);
+  }
 
   let remaining = SHOW_DURATION_SECONDS;
   countdown.textContent = `${remaining}s`;
@@ -1677,7 +1806,7 @@ function runReveal(target) {
     if (remaining <= 0) {
       clearInterval(countdownInterval);
       stageOverlay.classList.remove("passive");
-      stageOverlay.textContent = "La couleur est cachee. Reproduis-la puis valide.";
+      stageOverlay.textContent = revealConfig.stageHidden;
       stageColor.style.background = "repeating-linear-gradient(135deg, #e9ddc7 0 12px, #f8f1e4 12px 24px)";
       countdown.textContent = "A toi";
       setSlidersEnabled(true);
@@ -1704,7 +1833,7 @@ function handleOnlineResult(payload) {
       score: payload.score,
       target: { ...payload.target },
       guess: { ...guess },
-      name: payload.target.name,
+      label: payload.target.name || payload.target.code || null,
     };
 
     if (existingIndex >= 0) {
@@ -1717,8 +1846,16 @@ function handleOnlineResult(payload) {
   targetSwatch.style.background = hsl(payload.target.hue, payload.target.tint, payload.target.lightness);
   guessSwatch.style.background = hsl(guess.hue, guess.tint, guess.lightness);
 
-  colorNameText.textContent = payload.target.name ? `Nom de la couleur: ${payload.target.name}` : "";
-  colorNameText.classList.toggle("hidden", !payload.target.name);
+  if (payload.target.name) {
+    colorNameText.textContent = `Nom de la couleur: ${payload.target.name}`;
+    colorNameText.classList.remove("hidden");
+  } else if (payload.target.code) {
+    colorNameText.textContent = `Code couleur (${payload.target.codeFormat || ""}): ${payload.target.code}`;
+    colorNameText.classList.remove("hidden");
+  } else {
+    colorNameText.textContent = "";
+    colorNameText.classList.add("hidden");
+  }
 
   animateRoundScore(payload.roundNumber, payload.maxRounds, payload.score, {
     inStage: true,
@@ -1760,9 +1897,14 @@ if (socket) {
     onlineRoundNumber = state.roundNumber || 0;
     onlineTotalRounds = state.maxRounds || MATCH_ROUNDS;
     onlinePlayersCount = state.players.length;
+    onlineMode = ["memory", "name", "code"].includes(state.mode) ? state.mode : onlineMode;
+    onlineCodeFormat = ["auto", "hex", "rgb", "hsl"].includes(state.codeFormat) ? state.codeFormat : onlineCodeFormat;
 
     roomInfo.textContent = currentRoomCode ? `Salon: ${currentRoomCode}` : "";
     renderPlayers(state.players);
+    updateOnlineModeUi();
+    updateModeCopy();
+    updateResultLabels();
     updateMenuButtons();
   });
 
@@ -1775,14 +1917,23 @@ if (socket) {
     updateMenuButtons();
   });
 
-  socket.on("round_started", ({ target }) => {
+  socket.on("round_started", ({ target, mode, codeFormat }) => {
+    if (mode) {
+      onlineMode = ["memory", "name", "code"].includes(mode) ? mode : onlineMode;
+    }
+    if (codeFormat) {
+      onlineCodeFormat = ["auto", "hex", "rgb", "hsl"].includes(codeFormat) ? codeFormat : onlineCodeFormat;
+    }
+    updateOnlineModeUi();
     setOnlineStatus("Manche demarree.");
-    runReveal(target);
+    runReveal(target, gameMode === "online" ? onlineMode : localMode);
   });
 
   socket.on("guess_phase", () => {
     stageOverlay.classList.remove("passive");
-    stageOverlay.textContent = "La couleur est cachee. Reproduis-la puis valide.";
+    stageOverlay.textContent = gameMode === "online"
+      ? getOnlineModeConfig().stageHidden
+      : getLocalModeConfig().stageHidden;
     stageColor.style.background = "repeating-linear-gradient(135deg, #e9ddc7 0 12px, #f8f1e4 12px 24px)";
     countdown.textContent = "A toi";
     setSlidersEnabled(true);
@@ -1816,7 +1967,7 @@ createRoomBtn.addEventListener("click", () => {
     return;
   }
 
-  socket.emit("create_room", { name: getPlayerName() });
+  socket.emit("create_room", { name: getPlayerName(), mode: onlineMode, codeFormat: onlineCodeFormat });
   setOnlineStatus("Salon cree. Partage le code.");
 });
 
@@ -1837,6 +1988,41 @@ menuStartOnlineMatchBtn.addEventListener("click", () => {
     return;
   }
   socket.emit("start_match", { roomCode: currentRoomCode });
+});
+
+onlineMemoryModeBtn.addEventListener("click", () => {
+  pulseButton(onlineMemoryModeBtn);
+  setOnlineMode("memory");
+});
+
+onlineNameModeBtn.addEventListener("click", () => {
+  pulseButton(onlineNameModeBtn);
+  setOnlineMode("name");
+});
+
+onlineCodeModeBtn.addEventListener("click", () => {
+  pulseButton(onlineCodeModeBtn);
+  setOnlineMode("code");
+});
+
+onlineCodeFormatAutoBtn.addEventListener("click", () => {
+  pulseButton(onlineCodeFormatAutoBtn);
+  setOnlineCodeFormat("auto");
+});
+
+onlineCodeFormatHexBtn.addEventListener("click", () => {
+  pulseButton(onlineCodeFormatHexBtn);
+  setOnlineCodeFormat("hex");
+});
+
+onlineCodeFormatRgbBtn.addEventListener("click", () => {
+  pulseButton(onlineCodeFormatRgbBtn);
+  setOnlineCodeFormat("rgb");
+});
+
+onlineCodeFormatHslBtn.addEventListener("click", () => {
+  pulseButton(onlineCodeFormatHslBtn);
+  setOnlineCodeFormat("hsl");
 });
 
 quickStartBtn.addEventListener("click", () => {

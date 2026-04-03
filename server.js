@@ -38,6 +38,85 @@ const authSessions = new Map();
 const rooms = new Map();
 const roomTimers = new Map();
 
+const NAMED_COLOR_BASES = [
+  { name: "Corail", hue: 16, tint: 86 },
+  { name: "Saphir", hue: 217, tint: 82 },
+  { name: "Menthe", hue: 156, tint: 64 },
+  { name: "Miel", hue: 43, tint: 92 },
+  { name: "Violet", hue: 275, tint: 70 },
+  { name: "Lagune", hue: 190, tint: 75 },
+  { name: "Pistache", hue: 94, tint: 68 },
+  { name: "Rubis", hue: 352, tint: 76 },
+  { name: "Amande", hue: 78, tint: 48 },
+  { name: "Tangerine", hue: 28, tint: 92 },
+  { name: "Indigo", hue: 239, tint: 64 },
+  { name: "Turquoise", hue: 175, tint: 72 },
+  { name: "Cramoisi", hue: 348, tint: 73 },
+  { name: "Cerise", hue: 356, tint: 82 },
+  { name: "Framboise", hue: 337, tint: 78 },
+  { name: "Bordeaux", hue: 344, tint: 56 },
+  { name: "Magenta", hue: 320, tint: 84 },
+  { name: "Fuchsia", hue: 309, tint: 79 },
+  { name: "Prune", hue: 291, tint: 53 },
+  { name: "Amethyste", hue: 278, tint: 68 },
+  { name: "Lavande", hue: 263, tint: 58 },
+  { name: "Mauve", hue: 284, tint: 45 },
+  { name: "Ultramarine", hue: 231, tint: 82 },
+  { name: "Cobalt", hue: 223, tint: 74 },
+  { name: "Bleu acier", hue: 208, tint: 46 },
+  { name: "Bleu glacier", hue: 199, tint: 62 },
+  { name: "Azur", hue: 204, tint: 92 },
+  { name: "Ocean", hue: 197, tint: 68 },
+  { name: "Petrole", hue: 188, tint: 57 },
+  { name: "Canard", hue: 181, tint: 49 },
+  { name: "Emeraude", hue: 147, tint: 74 },
+  { name: "Jade", hue: 141, tint: 58 },
+  { name: "Foret", hue: 123, tint: 52 },
+  { name: "Sauge", hue: 112, tint: 34 },
+  { name: "Olive", hue: 83, tint: 45 },
+  { name: "Citron vert", hue: 96, tint: 78 },
+  { name: "Citron", hue: 58, tint: 84 },
+  { name: "Or", hue: 48, tint: 86 },
+  { name: "Ocre", hue: 39, tint: 61 },
+  { name: "Ambre", hue: 35, tint: 88 },
+  { name: "Caramel", hue: 26, tint: 59 },
+  { name: "Cuivre", hue: 22, tint: 66 },
+  { name: "Terracotta", hue: 15, tint: 58 },
+  { name: "Saumon", hue: 8, tint: 78 },
+  { name: "Poudre", hue: 350, tint: 38 },
+  { name: "Peche", hue: 23, tint: 80 },
+  { name: "Rose pastel", hue: 333, tint: 47 },
+  { name: "Rose vif", hue: 343, tint: 88 },
+  { name: "Sable", hue: 36, tint: 32 },
+  { name: "Beige", hue: 41, tint: 28 },
+  { name: "Ivoire", hue: 52, tint: 24 },
+  { name: "Ardoise", hue: 216, tint: 18 },
+  { name: "Graphite", hue: 225, tint: 10 },
+  { name: "Brume", hue: 206, tint: 16 },
+  { name: "Perle", hue: 198, tint: 20 },
+];
+
+const NAMED_COLOR_VARIANTS = [
+  { id: "base", label: "", hueOffset: 0, tintOffset: 0 },
+  { id: "clair", label: " clair", hueOffset: 2, tintOffset: -12 },
+  { id: "profond", label: " profond", hueOffset: -2, tintOffset: 10 },
+  { id: "vif", label: " vif", hueOffset: 0, tintOffset: 14 },
+  { id: "fume", label: " fume", hueOffset: -4, tintOffset: -16 },
+];
+
+const CODE_FORMATS = {
+  auto: "Auto",
+  hex: "HEX",
+  rgb: "RGB",
+  hsl: "HSL",
+};
+
+const ONLINE_MODE_LABELS = {
+  memory: "Mémoire",
+  name: "Nom couleur",
+  code: "Mode code",
+};
+
 function hashPassword(password) {
   const salt = crypto.randomBytes(16).toString("hex");
   const hash = crypto.scryptSync(password, salt, 64).toString("hex");
@@ -111,6 +190,121 @@ function randomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function wrapHue(value) {
+  const wrapped = value % 360;
+  return wrapped < 0 ? wrapped + 360 : wrapped;
+}
+
+function hsl(h, s, l) {
+  return `hsl(${h}, ${s}%, ${l}%)`;
+}
+
+function hslToRgb(h, s, l) {
+  const hue = ((h % 360) + 360) % 360;
+  const sat = clamp(s, 0, 100) / 100;
+  const lig = clamp(l, 0, 100) / 100;
+
+  const c = (1 - Math.abs((2 * lig) - 1)) * sat;
+  const hh = hue / 60;
+  const x = c * (1 - Math.abs((hh % 2) - 1));
+
+  let r1 = 0;
+  let g1 = 0;
+  let b1 = 0;
+
+  if (hh >= 0 && hh < 1) {
+    r1 = c;
+    g1 = x;
+  } else if (hh < 2) {
+    r1 = x;
+    g1 = c;
+  } else if (hh < 3) {
+    g1 = c;
+    b1 = x;
+  } else if (hh < 4) {
+    g1 = x;
+    b1 = c;
+  } else if (hh < 5) {
+    r1 = x;
+    b1 = c;
+  } else {
+    r1 = c;
+    b1 = x;
+  }
+
+  const m = lig - (c / 2);
+  return {
+    r: Math.round((r1 + m) * 255),
+    g: Math.round((g1 + m) * 255),
+    b: Math.round((b1 + m) * 255),
+  };
+}
+
+function rgbToHex({ r, g, b }) {
+  const toHex = (n) => clamp(Math.round(n), 0, 255).toString(16).padStart(2, "0").toUpperCase();
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+function rgbToHsl(r, g, b) {
+  const rr = clamp(r, 0, 255) / 255;
+  const gg = clamp(g, 0, 255) / 255;
+  const bb = clamp(b, 0, 255) / 255;
+
+  const max = Math.max(rr, gg, bb);
+  const min = Math.min(rr, gg, bb);
+  const delta = max - min;
+
+  let h = 0;
+  if (delta !== 0) {
+    if (max === rr) {
+      h = 60 * (((gg - bb) / delta) % 6);
+    } else if (max === gg) {
+      h = 60 * (((bb - rr) / delta) + 2);
+    } else {
+      h = 60 * (((rr - gg) / delta) + 4);
+    }
+  }
+  if (h < 0) {
+    h += 360;
+  }
+
+  const l = (max + min) / 2;
+  const s = delta === 0 ? 0 : delta / (1 - Math.abs((2 * l) - 1));
+
+  return {
+    h: Math.round(h),
+    s: Math.round(s * 100),
+    l: Math.round(l * 100),
+  };
+}
+
+function hslDistance(target, guess) {
+  const hueDiffRaw = Math.abs(guess.hue - target.hue);
+  const hueDiff = Math.min(hueDiffRaw, 360 - hueDiffRaw);
+  const tintDiff = Math.abs(guess.tint - target.tint);
+  const lightnessDiff = Math.abs(guess.lightness - target.lightness);
+  const hueWeight = 1.3;
+  const tintWeight = 1;
+  const lightnessWeight = 0.9;
+  const normalizedHue = hueDiff / 180;
+  const normalizedTint = tintDiff / 100;
+  const normalizedLightness = lightnessDiff / 100;
+  const weightedDistance =
+    Math.sqrt(
+      (normalizedHue * hueWeight) ** 2
+      + (normalizedTint * tintWeight) ** 2
+      + (normalizedLightness * lightnessWeight) ** 2,
+    ) /
+    Math.sqrt(hueWeight ** 2 + tintWeight ** 2 + lightnessWeight ** 2);
+  const strictnessExponent = 2.2;
+  const score = Math.max(0, Number((((1 - weightedDistance) ** strictnessExponent) * 100).toFixed(2)));
+  return { score, hueDiff, tintDiff, lightnessDiff };
+}
+
 function hueCircularDiff(a, b) {
   const raw = Math.abs(a - b);
   return Math.min(raw, 360 - raw);
@@ -144,6 +338,101 @@ function createRandomTarget(previousColor) {
   }
 
   return candidate;
+}
+
+function shuffleArray(items) {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    const j = randomInt(0, i);
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
+function buildNamedColorPool() {
+  const allowedVariants = new Set(["base", "clair", "profond"]);
+  const generated = [];
+
+  for (const baseColor of NAMED_COLOR_BASES) {
+    for (const variant of NAMED_COLOR_VARIANTS) {
+      if (!allowedVariants.has(variant.id)) {
+        continue;
+      }
+
+      generated.push({
+        name: `${baseColor.name}${variant.label}`,
+        hue: wrapHue(baseColor.hue + variant.hueOffset),
+        tint: clamp(baseColor.tint + variant.tintOffset, 12, 96),
+        lightness: 50,
+      });
+    }
+  }
+
+  return shuffleArray(generated);
+}
+
+function refillNamedColorPool(room) {
+  room.namedColorPool = buildNamedColorPool();
+}
+
+function getColorCodeLabel(hue, tint, lightness = 50, format = "auto") {
+  const rgb = hslToRgb(hue, tint, lightness);
+  const selectedFormat = format === "auto"
+    ? ["hex", "rgb", "hsl"][randomInt(0, 2)]
+    : format;
+
+  if (selectedFormat === "hex") {
+    return { format: "HEX", value: rgbToHex(rgb) };
+  }
+
+  if (selectedFormat === "hsl") {
+    return {
+      format: "HSL",
+      value: `hsl(${Math.round(hue)}, ${Math.round(tint)}%, ${Math.round(lightness)}%)`,
+    };
+  }
+
+  return {
+    format: "RGB",
+    value: `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`,
+  };
+}
+
+function createOnlineTarget(room) {
+  if (room.mode === "name") {
+    if (!room.namedColorPool || room.namedColorPool.length === 0) {
+      refillNamedColorPool(room);
+    }
+
+    const next = room.namedColorPool.pop();
+    room.lastNamedTarget = next;
+    return {
+      name: next.name,
+      hue: next.hue,
+      tint: next.tint,
+      lightness: next.lightness,
+    };
+  }
+
+  const next = createRandomTarget(room.lastRandomTarget);
+  room.lastRandomTarget = next;
+
+  if (room.mode === "code") {
+    const code = getColorCodeLabel(next.hue, next.tint, next.lightness, room.codeFormat);
+    return {
+      code: code.value,
+      codeFormat: code.format,
+      hue: next.hue,
+      tint: next.tint,
+      lightness: next.lightness,
+    };
+  }
+
+  return {
+    hue: next.hue,
+    tint: next.tint,
+    lightness: next.lightness,
+  };
 }
 
 function makeRoomCode() {
@@ -200,6 +489,8 @@ function emitRoomState(roomCode) {
     roundNumber: room.roundNumber,
     maxRounds: room.maxRounds,
     phase: room.phase,
+    mode: room.mode,
+    codeFormat: room.codeFormat,
     players: getRoomPlayerArray(room),
   });
 }
@@ -228,8 +519,7 @@ function startRoomRound(roomCode) {
 
   room.phase = "show";
   room.roundNumber += 1;
-  room.target = createRandomTarget(room.lastRandomTarget);
-  room.lastRandomTarget = room.target;
+  room.target = createOnlineTarget(room);
 
   for (const player of room.players.values()) {
     player.submitted = false;
@@ -242,6 +532,8 @@ function startRoomRound(roomCode) {
     durationMs: SHOW_DURATION_MS,
     roundNumber: room.roundNumber,
     maxRounds: room.maxRounds,
+    mode: room.mode,
+    codeFormat: room.codeFormat,
   });
   emitRoomState(roomCode);
 
@@ -399,20 +691,27 @@ app.post("/api/auth/logout", (req, res) => {
 app.use(express.static(path.join(__dirname)));
 
 io.on("connection", (socket) => {
-  socket.on("create_room", ({ name }) => {
+  socket.on("create_room", ({ name, mode, codeFormat }) => {
     let roomCode = makeRoomCode();
     while (rooms.has(roomCode)) {
       roomCode = makeRoomCode();
     }
+
+    const normalizedMode = ["memory", "name", "code"].includes(mode) ? mode : "memory";
+    const normalizedCodeFormat = ["auto", "hex", "rgb", "hsl"].includes(codeFormat) ? codeFormat : "auto";
 
     const room = {
       hostId: socket.id,
       phase: "idle",
       target: null,
       lastRandomTarget: null,
+      lastNamedTarget: null,
       matchActive: false,
       roundNumber: 0,
       maxRounds: MATCH_ROUNDS,
+      mode: normalizedMode,
+      codeFormat: normalizedCodeFormat,
+      namedColorPool: normalizedMode === "name" ? buildNamedColorPool() : [],
       players: new Map(),
     };
 
@@ -470,6 +769,11 @@ io.on("connection", (socket) => {
     room.roundNumber = 0;
     room.phase = "idle";
     room.lastRandomTarget = null;
+    room.lastNamedTarget = null;
+
+    if (room.mode === "name") {
+      refillNamedColorPool(room);
+    }
 
     for (const player of room.players.values()) {
       player.submitted = false;
@@ -481,6 +785,33 @@ io.on("connection", (socket) => {
 
     io.to(roomCode).emit("match_started", { maxRounds: room.maxRounds });
     startRoomRound(roomCode);
+  });
+
+  socket.on("set_room_mode", ({ roomCode, mode, codeFormat }) => {
+    const room = rooms.get(roomCode);
+    if (!room) {
+      return;
+    }
+
+    if (room.hostId !== socket.id) {
+      socket.emit("error_message", "Seul le host peut changer le mode en ligne.");
+      return;
+    }
+
+    if (room.matchActive) {
+      socket.emit("error_message", "Le mode ne peut pas etre change pendant une partie.");
+      return;
+    }
+
+    const normalizedMode = ["memory", "name", "code"].includes(mode) ? mode : "memory";
+    const normalizedCodeFormat = ["auto", "hex", "rgb", "hsl"].includes(codeFormat) ? codeFormat : "auto";
+
+    room.mode = normalizedMode;
+    room.codeFormat = normalizedMode === "code" ? normalizedCodeFormat : "auto";
+    room.lastRandomTarget = null;
+    room.lastNamedTarget = null;
+    room.namedColorPool = normalizedMode === "name" ? buildNamedColorPool() : [];
+    emitRoomState(roomCode);
   });
 
   socket.on("start_round", ({ roomCode }) => {
