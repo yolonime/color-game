@@ -102,3 +102,17 @@ export function getClosestNamedColor(hue, tint, lightness, namedColorBases, name
 
   return best;
 }
+
+/**
+ * Create a random target color for game rounds
+ * Kept for compatibility with modules that import createRandomTarget
+ * @param {number} fixedLightness - Lightness lock (default 50)
+ * @returns {{hue:number,tint:number,lightness:number}}
+ */
+export function createRandomTarget(fixedLightness = 50) {
+  return {
+    hue: Math.floor(Math.random() * 360),
+    tint: Math.floor(Math.random() * 77) + 18,
+    lightness: clamp(fixedLightness, 0, 100),
+  };
+}
