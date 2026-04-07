@@ -77,10 +77,11 @@ src/
 - **Statut**: Modules créés avec ES6 exports, exposés via window.ColorGuesser.Color
 
 ### Phase 3 : Système Métier ⏳
-- `score/system.js` - Scoring, animations, tiers
-- `mode/config.js` - Config modes (eyebrow, subtitle, labels)
-- `mode/manager.js` - Switchs modes, setGameMode, setLocalMode, etc
-- `mode/theme.js` - setTheme, data-theme
+- [x] `score/system.js` - Scoring, animations, tiers
+- [x] `mode/config.js` - Config modes (labels, descriptions)
+- [ ] `mode/manager.js` - Switchs modes, setGameMode, setLocalMode, etc
+- [ ] `mode/theme.js` - setTheme, data-theme
+- **Statut**: Modules utilitaires créés, mode manager à faire (contient logique complexe)
 
 ### Phase 4 : UI & UX ⏳
 - `ui/updater.js` - updatePlayerPreview, updateSliderImpactBars, updateModeCopy, etc

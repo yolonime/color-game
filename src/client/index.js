@@ -21,6 +21,10 @@ import * as ColorParsing from './color/parsing.js';
 import * as ColorDistance from './color/distance.js';
 import * as NamedColors from './color/named-colors.js';
 
+// ====== BUSINESS SYSTEM (Phase 3) ======
+import * as ModeConfig from './mode/config.js';
+import * as ScoreSystem from './score/system.js';
+
 // ====== Expose au contexte global pour rétro-compatibilité ======
 // Cela permet d'utiliser les modules préparés pendant que script.js reste le moteur principal.
 window.ColorGuesser = window.ColorGuesser || {};
@@ -32,6 +36,12 @@ window.ColorGuesser.Color = {
   parsing: ColorParsing,
   distance: ColorDistance,
   namedColors: NamedColors,
+};
+window.ColorGuesser.Mode = {
+  config: ModeConfig,
+};
+window.ColorGuesser.Score = {
+  system: ScoreSystem,
 };
 
 function loadLegacyScript() {
