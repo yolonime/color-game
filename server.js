@@ -285,6 +285,8 @@ function getRoomPlayerArray(room) {
     name: player.name,
     isHost: room.hostId === player.id,
     submitted: !!player.submitted,
+    totalScore: Number(player.totalScore || 0),
+    lastScore: Number(player.lastScore || 0),
   }));
 }
 

@@ -2040,9 +2040,11 @@ function scoreGuess() {
 
 function renderPlayers(players) {
   playersList.innerHTML = "";
+  const matchMaxScore = Math.max(100, (onlineTotalRounds || MATCH_ROUNDS) * 100);
   for (const player of players) {
     const item = document.createElement("li");
-    item.textContent = `${player.name}${player.isHost ? " (host)" : ""}${player.submitted ? " - pret" : ""}`;
+    const sharedScore = formatScore(Number(player.totalScore || 0));
+    item.textContent = `${player.name}${player.isHost ? " (host)" : ""} - ${sharedScore}/${matchMaxScore}${player.submitted ? " - pret" : ""}`;
     playersList.appendChild(item);
   }
 }
