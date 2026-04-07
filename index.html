@@ -388,7 +388,19 @@
     </section>
   </main>
 
+  <!-- Socket.IO: Try server first, fallback to CDN -->
   <script src="/socket.io/socket.io.js"></script>
+  <script>
+    // If socket.io didn't load from server, try CDN
+    if (typeof io === 'undefined') {
+      var script = document.createElement('script');
+      script.src = 'https://cdn.socket.io/4.5.4/socket.io.js';
+      script.onerror = function() {
+        console.warn('⚠️  Socket.IO not available. Server connection will not work.');
+      };
+      document.head.appendChild(script);
+    }
+  </script>
   <script type="module" src="src/client/index.js"></script>
 </body>
 </html>

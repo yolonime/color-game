@@ -3,9 +3,8 @@
  * Handles all WebSocket listeners, emitters, and event coordination
  */
 
-import { io } from "https://cdn.socket.io/4.5.4/socket.io.esm.min.js";
-
 // Socket instance (initialized lazily)
+// Import io from global scope (loaded from server or CDN in index.html)
 let socket = null;
 let socketEventHandlers = {};
 
@@ -15,16 +14,28 @@ let socketEventHandlers = {};
 
 /**
  * Initialize socket.io connection
+ * Uses io object from global scope (window.io)
  * @returns {Object} Socket instance
  */
 export function initializeSocket() {
+  // Check if io is available globally (loaded from server or CDN)
+  if (typeof window === 'undefined' || !window.io) {
+    console.warn('⚠️  Socket.IO not available. Server may not be running.');
+    return null;
+  }
+
   if (socket && socket.connected) {
     return socket;
   }
 
-  socket = io();
-  registerDefaultListeners();
-  return socket;
+  try {
+    socket = window.io();
+    registerDefaultListeners();
+    return socket;
+  } catch (error) {
+    console.error('❌ Failed to initialize socket:', error);
+    return null;
+  }
 }
 
 /**
