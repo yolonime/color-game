@@ -777,6 +777,43 @@ body[data-theme="online"] .menu-drawer {
   margin-bottom: 0.35rem;
 }
 
+.room-chat-list {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0.55rem;
+  border: 1px solid rgba(31, 27, 22, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.72);
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.room-chat-list li {
+  margin: 0 0 0.42rem;
+  line-height: 1.35;
+  color: var(--ink-soft);
+}
+
+.room-chat-list li:last-child {
+  margin-bottom: 0;
+}
+
+.room-chat-list .chat-author {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.room-chat-compose {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.5rem;
+  margin-top: 0.55rem;
+}
+
+#roomChatInput {
+  margin: 0;
+}
+
 .game-card,
 .result {
   border: 1px solid var(--line);

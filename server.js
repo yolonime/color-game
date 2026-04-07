@@ -105,8 +105,30 @@ function createRoomState(socketId, name, mode, codeFormat) {
     mode: normalizedMode,
     codeFormat: normalizedMode === "code" ? normalizedCodeFormat : "auto",
     namedColorPool: normalizedMode === "name" ? buildNamedColorPool() : [],
+    chatMessages: [],
     players: new Map([[socketId, createPlayerState(socketId, name)]]),
   };
+}
+
+function addRoomChatMessage(room, playerName, message) {
+  const text = String(message || "").trim().slice(0, 220);
+  if (!text) {
+    return null;
+  }
+
+  const entry = {
+    id: crypto.randomUUID(),
+    name: String(playerName || "Joueur").slice(0, 20),
+    message: text,
+    at: Date.now(),
+  };
+
+  room.chatMessages.push(entry);
+  if (room.chatMessages.length > 60) {
+    room.chatMessages.splice(0, room.chatMessages.length - 60);
+  }
+
+  return entry;
 }
 
 function resetPlayerProgress(player) {
@@ -282,6 +304,7 @@ function emitRoomState(roomCode) {
     mode: room.mode,
     codeFormat: room.codeFormat,
     players: getRoomPlayerArray(room),
+    recentChat: room.chatMessages.slice(-30),
   });
 }
 
@@ -621,6 +644,26 @@ io.on("connection", (socket) => {
 
     emitRoomState(roomCode);
     tryCloseRound(roomCode);
+  });
+
+  socket.on("chat_message", ({ roomCode, message }) => {
+    const normalizedCode = String(roomCode || "").trim().toUpperCase();
+    const room = rooms.get(normalizedCode);
+    if (!room) {
+      return;
+    }
+
+    const player = room.players.get(socket.id);
+    if (!player) {
+      return;
+    }
+
+    const entry = addRoomChatMessage(room, player.name, message);
+    if (!entry) {
+      return;
+    }
+
+    io.to(normalizedCode).emit("room_chat_message", entry);
   });
 
   socket.on("disconnect", () => {

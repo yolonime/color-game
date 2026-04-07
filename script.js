@@ -108,6 +108,9 @@ const onlineStatus = document.getElementById("onlineStatus");
 const roomInfo = document.getElementById("roomInfo");
 const playersList = document.getElementById("playersList");
 const leaderboardList = document.getElementById("leaderboardList");
+const roomChatMessages = document.getElementById("roomChatMessages");
+const roomChatInput = document.getElementById("roomChatInput");
+const roomChatSendBtn = document.getElementById("roomChatSendBtn");
 const converterColorPicker = document.getElementById("converterColorPicker");
 const converterPreviewSwatch = document.getElementById("converterPreviewSwatch");
 const converterHueSlider = document.getElementById("converterHueSlider");
@@ -165,6 +168,7 @@ let isOnlineMatchRunning = false;
 let currentRoomCode = "";
 let isHost = false;
 let hasSubmittedOnline = false;
+let onlineChatHistory = [];
 
 let namedColorPool = [];
 let lastSoloRandomTarget = null;
@@ -1172,6 +1176,14 @@ function updateOnlineRoomUi() {
       heroCopyRoomCodeBtn.classList.add("hidden");
       heroCopyRoomCodeBtn.disabled = true;
     }
+    if (roomChatInput) {
+      roomChatInput.disabled = true;
+      roomChatInput.value = "";
+    }
+    if (roomChatSendBtn) {
+      roomChatSendBtn.disabled = true;
+    }
+    renderRoomChat([]);
     return;
   }
 
@@ -1201,6 +1213,13 @@ function updateOnlineRoomUi() {
   if (heroCopyRoomCodeBtn) {
     heroCopyRoomCodeBtn.classList.toggle("hidden", !hasRoom || !shouldShowHeroOnlinePanel);
     heroCopyRoomCodeBtn.disabled = !hasRoom || !shouldShowHeroOnlinePanel;
+  }
+
+  if (roomChatInput) {
+    roomChatInput.disabled = !hasRoom;
+  }
+  if (roomChatSendBtn) {
+    roomChatSendBtn.disabled = !hasRoom;
   }
 }
 
@@ -1998,6 +2017,47 @@ function renderLeaderboard(entries) {
   renderScorePages();
 }
 
+function renderRoomChat(messages) {
+  if (!roomChatMessages) {
+    return;
+  }
+
+  roomChatMessages.innerHTML = "";
+  if (!messages || messages.length === 0) {
+    const empty = document.createElement("li");
+    empty.textContent = "Aucun message pour l'instant.";
+    roomChatMessages.appendChild(empty);
+    return;
+  }
+
+  for (const entry of messages) {
+    const item = document.createElement("li");
+    const safeName = entry.name || "Joueur";
+    const text = entry.message || "";
+    item.innerHTML = `<span class="chat-author">${safeName}</span>: ${text}`;
+    roomChatMessages.appendChild(item);
+  }
+
+  roomChatMessages.scrollTop = roomChatMessages.scrollHeight;
+}
+
+function sendRoomChatMessage() {
+  if (!socket || !currentRoomCode || !roomChatInput) {
+    return;
+  }
+
+  const message = roomChatInput.value.trim();
+  if (!message) {
+    return;
+  }
+
+  socket.emit("chat_message", {
+    roomCode: currentRoomCode,
+    message,
+  });
+  roomChatInput.value = "";
+}
+
 function setOnlineStatus(message) {
   onlineStatus.textContent = message;
 }
@@ -2173,6 +2233,9 @@ if (socket) {
 
   socket.on("room_state", (state) => {
     currentRoomCode = state.roomCode;
+    if (currentRoomCode && gameMode !== "online") {
+      setGameMode("online");
+    }
     isHost = state.hostId === socket.id;
     isOnlineMatchRunning = !!state.matchActive;
     onlineRoundNumber = state.roundNumber || 0;
@@ -2180,6 +2243,8 @@ if (socket) {
     onlinePlayersCount = state.players.length;
     onlineMode = ["memory", "name", "code"].includes(state.mode) ? state.mode : onlineMode;
     onlineCodeFormat = ["auto", "hex", "rgb", "hsl"].includes(state.codeFormat) ? state.codeFormat : onlineCodeFormat;
+    onlineChatHistory = Array.isArray(state.recentChat) ? state.recentChat : onlineChatHistory;
+    renderRoomChat(onlineChatHistory);
 
     updateOnlineRoomUi();
     renderPlayers(state.players);
@@ -2199,6 +2264,9 @@ if (socket) {
   });
 
   socket.on("round_started", ({ target, mode, codeFormat }) => {
+    if (gameMode !== "online") {
+      setGameMode("online");
+    }
     if (mode) {
       onlineMode = ["memory", "name", "code"].includes(mode) ? mode : onlineMode;
     }
@@ -2211,6 +2279,7 @@ if (socket) {
   });
 
   socket.on("guess_phase", () => {
+    hasSubmittedOnline = false;
     stageOverlay.classList.remove("passive");
     stageOverlay.textContent = gameMode === "online"
       ? getOnlineModeConfig().stageHidden
@@ -2218,6 +2287,18 @@ if (socket) {
     stageColor.style.background = "repeating-linear-gradient(135deg, #e9ddc7 0 12px, #f8f1e4 12px 24px)";
     countdown.textContent = "A toi";
     setSlidersEnabled(true);
+  });
+
+  socket.on("room_chat_message", (entry) => {
+    if (!entry || !entry.message) {
+      return;
+    }
+
+    onlineChatHistory.push(entry);
+    if (onlineChatHistory.length > 30) {
+      onlineChatHistory.splice(0, onlineChatHistory.length - 30);
+    }
+    renderRoomChat(onlineChatHistory);
   });
 
   socket.on("round_result", (payload) => {
@@ -2302,6 +2383,22 @@ if (heroCopyRoomCodeBtn) {
       setOnlineStatus(`Code du salon copie: ${currentRoomCode}`);
     } catch {
       setOnlineStatus(`Copie impossible. Code du salon: ${currentRoomCode}`);
+    }
+  });
+}
+
+if (roomChatSendBtn) {
+  roomChatSendBtn.addEventListener("click", () => {
+    pulseButton(roomChatSendBtn);
+    sendRoomChatMessage();
+  });
+}
+
+if (roomChatInput) {
+  roomChatInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      sendRoomChatMessage();
     }
   });
 }
