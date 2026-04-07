@@ -5,24 +5,48 @@ const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
 const Database = require("better-sqlite3");
+const {
+  SHOW_DURATION_MS,
+  MATCH_ROUNDS,
+  NEXT_ROUND_DELAY_MS,
+  AUTH_COOKIE_NAME,
+  AUTH_TTL_MS,
+  VALID_ONLINE_MODES,
+  VALID_CODE_FORMATS,
+  NAMED_COLOR_DIFFICULTIES,
+  NAMED_COLOR_BASES,
+  NAMED_COLOR_VARIANTS,
+  CODE_FORMATS,
+  ONLINE_MODE_LABELS,
+} = require("./src/server/constants");
+const {
+  hashPassword,
+  verifyPassword,
+  parseCookies,
+  setAuthCookie,
+  clearAuthCookie,
+  getSessionFromRequest,
+} = require("./src/server/auth-utils");
+const {
+  randomInt,
+  clamp,
+  wrapHue,
+  hsl,
+  hslToRgb,
+  rgbToHex,
+  rgbToHsl,
+  hslDistance,
+  hueCircularDiff,
+  isColorTooClose,
+  createRandomTarget,
+  shuffleArray,
+  getColorCodeLabel,
+} = require("./src/server/color-utils");
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
-
 const PORT = process.env.PORT || 3000;
-const SHOW_DURATION_MS = 5000;
-const MATCH_ROUNDS = 5;
-const NEXT_ROUND_DELAY_MS = 1400;
-const AUTH_COOKIE_NAME = "cg_auth";
-const AUTH_TTL_MS = 1000 * 60 * 60 * 24 * 30;
-const VALID_ONLINE_MODES = new Set(["memory", "name", "code"]);
-const VALID_CODE_FORMATS = new Set(["auto", "hex", "rgb", "hsl"]);
-const NAMED_COLOR_DIFFICULTIES = {
-  easy: ["base"],
-  normal: ["base", "clair", "profond"],
-  expert: ["base", "clair", "profond", "vif", "fume"],
-};
 
 const dataDir = process.env.DATA_DIR
   ? path.resolve(process.env.DATA_DIR)
@@ -44,273 +68,6 @@ const authSessions = new Map();
 
 const rooms = new Map();
 const roomTimers = new Map();
-
-const NAMED_COLOR_BASES = [
-  { name: "Corail", hue: 16, tint: 86 },
-  { name: "Saphir", hue: 217, tint: 82 },
-  { name: "Menthe", hue: 156, tint: 64 },
-  { name: "Miel", hue: 43, tint: 92 },
-  { name: "Violet", hue: 275, tint: 70 },
-  { name: "Lagune", hue: 190, tint: 75 },
-  { name: "Pistache", hue: 94, tint: 68 },
-  { name: "Rubis", hue: 352, tint: 76 },
-  { name: "Amande", hue: 78, tint: 48 },
-  { name: "Tangerine", hue: 28, tint: 92 },
-  { name: "Indigo", hue: 239, tint: 64 },
-  { name: "Turquoise", hue: 175, tint: 72 },
-  { name: "Cramoisi", hue: 348, tint: 73 },
-  { name: "Cerise", hue: 356, tint: 82 },
-  { name: "Framboise", hue: 337, tint: 78 },
-  { name: "Bordeaux", hue: 344, tint: 56 },
-  { name: "Magenta", hue: 320, tint: 84 },
-  { name: "Fuchsia", hue: 309, tint: 79 },
-  { name: "Prune", hue: 291, tint: 53 },
-  { name: "Amethyste", hue: 278, tint: 68 },
-  { name: "Lavande", hue: 263, tint: 58 },
-  { name: "Mauve", hue: 284, tint: 45 },
-  { name: "Ultramarine", hue: 231, tint: 82 },
-  { name: "Cobalt", hue: 223, tint: 74 },
-  { name: "Bleu acier", hue: 208, tint: 46 },
-  { name: "Bleu glacier", hue: 199, tint: 62 },
-  { name: "Azur", hue: 204, tint: 92 },
-  { name: "Ocean", hue: 197, tint: 68 },
-  { name: "Petrole", hue: 188, tint: 57 },
-  { name: "Canard", hue: 181, tint: 49 },
-  { name: "Emeraude", hue: 147, tint: 74 },
-  { name: "Jade", hue: 141, tint: 58 },
-  { name: "Foret", hue: 123, tint: 52 },
-  { name: "Sauge", hue: 112, tint: 34 },
-  { name: "Olive", hue: 83, tint: 45 },
-  { name: "Citron vert", hue: 96, tint: 78 },
-  { name: "Citron", hue: 58, tint: 84 },
-  { name: "Or", hue: 48, tint: 86 },
-  { name: "Ocre", hue: 39, tint: 61 },
-  { name: "Ambre", hue: 35, tint: 88 },
-  { name: "Caramel", hue: 26, tint: 59 },
-  { name: "Cuivre", hue: 22, tint: 66 },
-  { name: "Terracotta", hue: 15, tint: 58 },
-  { name: "Saumon", hue: 8, tint: 78 },
-  { name: "Poudre", hue: 350, tint: 38 },
-  { name: "Peche", hue: 23, tint: 80 },
-  { name: "Rose pastel", hue: 333, tint: 47 },
-  { name: "Rose vif", hue: 343, tint: 88 },
-  { name: "Sable", hue: 36, tint: 32 },
-  { name: "Beige", hue: 41, tint: 28 },
-  { name: "Ivoire", hue: 52, tint: 24 },
-  { name: "Ardoise", hue: 216, tint: 18 },
-  { name: "Graphite", hue: 225, tint: 10 },
-  { name: "Brume", hue: 206, tint: 16 },
-  { name: "Perle", hue: 198, tint: 20 },
-];
-
-const NAMED_COLOR_VARIANTS = [
-  { id: "base", label: "", hueOffset: 0, tintOffset: 0 },
-  { id: "clair", label: " clair", hueOffset: 2, tintOffset: -12 },
-  { id: "profond", label: " profond", hueOffset: -2, tintOffset: 10 },
-  { id: "vif", label: " vif", hueOffset: 0, tintOffset: 14 },
-  { id: "fume", label: " fume", hueOffset: -4, tintOffset: -16 },
-];
-
-const CODE_FORMATS = {
-  auto: "Auto",
-  hex: "HEX",
-  rgb: "RGB",
-  hsl: "HSL",
-};
-
-const ONLINE_MODE_LABELS = {
-  memory: "Mémoire",
-  name: "Nom couleur",
-  code: "Mode code",
-};
-
-function hashPassword(password) {
-  const salt = crypto.randomBytes(16).toString("hex");
-  const hash = crypto.scryptSync(password, salt, 64).toString("hex");
-  return `${salt}:${hash}`;
-}
-
-function verifyPassword(password, encodedHash) {
-  const [salt, storedHash] = String(encodedHash || "").split(":");
-  if (!salt || !storedHash) {
-    return false;
-  }
-  const candidateHash = crypto.scryptSync(password, salt, 64).toString("hex");
-  const a = Buffer.from(storedHash, "hex");
-  const b = Buffer.from(candidateHash, "hex");
-  if (a.length !== b.length) {
-    return false;
-  }
-  return crypto.timingSafeEqual(a, b);
-}
-
-function parseCookies(req) {
-  const header = req.headers.cookie;
-  if (!header) {
-    return {};
-  }
-
-  const parsed = {};
-  const pairs = header.split(";");
-  for (const pair of pairs) {
-    const [rawKey, ...rawValue] = pair.trim().split("=");
-    if (!rawKey) {
-      continue;
-    }
-    parsed[rawKey] = decodeURIComponent(rawValue.join("="));
-  }
-  return parsed;
-}
-
-function setAuthCookie(res, token) {
-  res.setHeader(
-    "Set-Cookie",
-    `${AUTH_COOKIE_NAME}=${encodeURIComponent(token)}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${Math.floor(AUTH_TTL_MS / 1000)}`,
-  );
-}
-
-function clearAuthCookie(res) {
-  res.setHeader("Set-Cookie", `${AUTH_COOKIE_NAME}=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`);
-}
-
-function getSessionFromRequest(req) {
-  const cookies = parseCookies(req);
-  const token = cookies[AUTH_COOKIE_NAME];
-  if (!token) {
-    return null;
-  }
-
-  const session = authSessions.get(token);
-  if (!session) {
-    return null;
-  }
-
-  if (Date.now() - session.createdAt > AUTH_TTL_MS) {
-    authSessions.delete(token);
-    return null;
-  }
-
-  return { token, ...session };
-}
-
-function randomInt(min, max) {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
-}
-
-function wrapHue(value) {
-  const wrapped = value % 360;
-  return wrapped < 0 ? wrapped + 360 : wrapped;
-}
-
-function hsl(h, s, l) {
-  return `hsl(${h}, ${s}%, ${l}%)`;
-}
-
-function hslToRgb(h, s, l) {
-  const hue = ((h % 360) + 360) % 360;
-  const sat = clamp(s, 0, 100) / 100;
-  const lig = clamp(l, 0, 100) / 100;
-
-  const c = (1 - Math.abs((2 * lig) - 1)) * sat;
-  const hh = hue / 60;
-  const x = c * (1 - Math.abs((hh % 2) - 1));
-
-  let r1 = 0;
-  let g1 = 0;
-  let b1 = 0;
-
-  if (hh >= 0 && hh < 1) {
-    r1 = c;
-    g1 = x;
-  } else if (hh < 2) {
-    r1 = x;
-    g1 = c;
-  } else if (hh < 3) {
-    g1 = c;
-    b1 = x;
-  } else if (hh < 4) {
-    g1 = x;
-    b1 = c;
-  } else if (hh < 5) {
-    r1 = x;
-    b1 = c;
-  } else {
-    r1 = c;
-    b1 = x;
-  }
-
-  const m = lig - (c / 2);
-  return {
-    r: Math.round((r1 + m) * 255),
-    g: Math.round((g1 + m) * 255),
-    b: Math.round((b1 + m) * 255),
-  };
-}
-
-function rgbToHex({ r, g, b }) {
-  const toHex = (n) => clamp(Math.round(n), 0, 255).toString(16).padStart(2, "0").toUpperCase();
-  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-}
-
-function rgbToHsl(r, g, b) {
-  const rr = clamp(r, 0, 255) / 255;
-  const gg = clamp(g, 0, 255) / 255;
-  const bb = clamp(b, 0, 255) / 255;
-
-  const max = Math.max(rr, gg, bb);
-  const min = Math.min(rr, gg, bb);
-  const delta = max - min;
-
-  let h = 0;
-  if (delta !== 0) {
-    if (max === rr) {
-      h = 60 * (((gg - bb) / delta) % 6);
-    } else if (max === gg) {
-      h = 60 * (((bb - rr) / delta) + 2);
-    } else {
-      h = 60 * (((rr - gg) / delta) + 4);
-    }
-  }
-  if (h < 0) {
-    h += 360;
-  }
-
-  const l = (max + min) / 2;
-  const s = delta === 0 ? 0 : delta / (1 - Math.abs((2 * l) - 1));
-
-  return {
-    h: Math.round(h),
-    s: Math.round(s * 100),
-    l: Math.round(l * 100),
-  };
-}
-
-function hslDistance(target, guess) {
-  const hueDiffRaw = Math.abs(guess.hue - target.hue);
-  const hueDiff = Math.min(hueDiffRaw, 360 - hueDiffRaw);
-  const tintDiff = Math.abs(guess.tint - target.tint);
-  const lightnessDiff = Math.abs(guess.lightness - target.lightness);
-  const hueWeight = 1.3;
-  const tintWeight = 1;
-  const lightnessWeight = 0.9;
-  const normalizedHue = hueDiff / 180;
-  const normalizedTint = tintDiff / 100;
-  const normalizedLightness = lightnessDiff / 100;
-  const weightedDistance =
-    Math.sqrt(
-      (normalizedHue * hueWeight) ** 2
-      + (normalizedTint * tintWeight) ** 2
-      + (normalizedLightness * lightnessWeight) ** 2,
-    ) /
-    Math.sqrt(hueWeight ** 2 + tintWeight ** 2 + lightnessWeight ** 2);
-  const strictnessExponent = 2.2;
-  const score = Math.max(0, Number((((1 - weightedDistance) ** strictnessExponent) * 100).toFixed(2)));
-  return { score, hueDiff, tintDiff, lightnessDiff };
-}
 
 function normalizeOnlineMode(mode) {
   return VALID_ONLINE_MODES.has(mode) ? mode : "memory";
@@ -405,50 +162,6 @@ function removeSocketFromRoom(socket, roomCode) {
   emitRoomState(roomCode);
 }
 
-function hueCircularDiff(a, b) {
-  const raw = Math.abs(a - b);
-  return Math.min(raw, 360 - raw);
-}
-
-function isColorTooClose(nextColor, previousColor) {
-  if (!previousColor) {
-    return false;
-  }
-  return (
-    hueCircularDiff(nextColor.hue, previousColor.hue) < 34
-    && Math.abs(nextColor.tint - previousColor.tint) < 18
-    && Math.abs(nextColor.lightness - previousColor.lightness) < 14
-  );
-}
-
-function createRandomTarget(previousColor) {
-  let candidate = null;
-
-  for (let attempt = 0; attempt < 16; attempt += 1) {
-    const next = {
-      hue: randomInt(0, 359),
-      tint: randomInt(4, 98),
-      lightness: randomInt(22, 78),
-    };
-
-    candidate = next;
-    if (!isColorTooClose(next, previousColor)) {
-      break;
-    }
-  }
-
-  return candidate;
-}
-
-function shuffleArray(items) {
-  const copy = [...items];
-  for (let i = copy.length - 1; i > 0; i -= 1) {
-    const j = randomInt(0, i);
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy;
-}
-
 function buildNamedColorPool() {
   const allowedVariants = new Set(["base", "clair", "profond"]);
   const generated = [];
@@ -473,29 +186,6 @@ function buildNamedColorPool() {
 
 function refillNamedColorPool(room) {
   room.namedColorPool = buildNamedColorPool();
-}
-
-function getColorCodeLabel(hue, tint, lightness = 50, format = "auto") {
-  const rgb = hslToRgb(hue, tint, lightness);
-  const selectedFormat = format === "auto"
-    ? ["hex", "rgb", "hsl"][randomInt(0, 2)]
-    : format;
-
-  if (selectedFormat === "hex") {
-    return { format: "HEX", value: rgbToHex(rgb) };
-  }
-
-  if (selectedFormat === "hsl") {
-    return {
-      format: "HSL",
-      value: `hsl(${Math.round(hue)}, ${Math.round(tint)}%, ${Math.round(lightness)}%)`,
-    };
-  }
-
-  return {
-    format: "RGB",
-    value: `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`,
-  };
 }
 
 function createOnlineTarget(room) {

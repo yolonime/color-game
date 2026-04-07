@@ -49,7 +49,9 @@ src/
 │   └── app.js               # Orchestrateur
 │
 ├── server/
-│   └── ... (Sera modularisé ensuite)
+│   ├── constants.js       # Constantes serveur et labels partagés
+│   ├── auth-utils.js      # Cookies, sessions, hash mot de passe
+│   └── color-utils.js     # Utilitaires couleur serveur
 │
 └── (fichiers racine)
     ├── script.js            # ← À progressivement migrer vers src/client/
@@ -92,6 +94,7 @@ src/
 - `auth.js` - authRequest, refreshAuthSession, setAuthenticatedUser
 - `socket-manager.js` - Tous socket.on et socket.emit
 - `events.js` - addEventListener (buttons, sliders, inputs)
+- Côté serveur, les modules `src/server/constants.js`, `src/server/auth-utils.js` et `src/server/color-utils.js` sont déjà extraits.
 
 ### Phase 7 : Intégration ⏳
 - Mettre à jour `index.html` avec imports ES6
