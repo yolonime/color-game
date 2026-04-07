@@ -3,7 +3,7 @@
  * Manages all user interaction events and UI delegations
  */
 
-import { getDomElements } from "./dom.js";
+import { DOM } from "./dom.js";
 
 // Event handler registry
 let eventHandlers = {};
@@ -122,7 +122,7 @@ export function setupSliderEvents(
   onSaturationSliderChange,
   onLightnessSliderChange
 ) {
-  const dom = getDomElements();
+  const dom = DOM;
 
   const cleanups = [];
 
@@ -167,7 +167,7 @@ export function setupSliderEvents(
  * @returns {Function} Cleanup function
  */
 export function setupButtonEvents(handlers) {
-  const dom = getDomElements();
+  const dom = DOM;
   const cleanups = [];
 
   const buttonMap = {
@@ -200,7 +200,7 @@ export function setupButtonEvents(handlers) {
  * @returns {Function} Cleanup function
  */
 export function setupFormEvents(onLoginSubmit, onRegisterSubmit) {
-  const dom = getDomElements();
+  const dom = DOM;
   const cleanups = [];
 
   if (dom.loginForm && onLoginSubmit) {
@@ -230,7 +230,7 @@ export function setupFormEvents(onLoginSubmit, onRegisterSubmit) {
  * @returns {Function} Cleanup function
  */
 export function setupInputEvents(onInputChange) {
-  const dom = getDomElements();
+  const dom = DOM;
   const cleanups = [];
 
   const inputSelectors = [
@@ -257,7 +257,7 @@ export function setupInputEvents(onInputChange) {
  * @returns {Function} Cleanup function
  */
 export function setupMenuToggleEvent(onMenuToggle) {
-  const dom = getDomElements();
+  const dom = DOM;
 
   if (!dom.menuBtn) {
     return () => {};
