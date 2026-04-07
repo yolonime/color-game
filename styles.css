@@ -329,6 +329,15 @@ body[data-theme="code"] {
   flex-wrap: wrap;
 }
 
+.score-history-toolbar input {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.86);
+  padding: 0.45rem 0.55rem;
+  font: inherit;
+  min-width: 160px;
+}
+
 .score-history-list {
   margin: 0;
   padding-left: 1.1rem;

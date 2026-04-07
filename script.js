@@ -194,6 +194,11 @@ let isUpdatingGuessCode = false;
 let appView = "game";
 let authenticatedUser = null;
 let persistedTracking = null;
+let friendsData = [];
+let incomingFriendRequests = [];
+let outgoingFriendRequests = [];
+let friendsPollingInterval = null;
+let hasHydratedFriendsPresence = false;
 let historySourceFilter = "all";
 let historyModeFilter = "all";
 let historyPeriodFilter = "30d";
@@ -219,6 +224,35 @@ function toDateTimeLabel(timestamp) {
     });
   } catch {
     return "-";
+  }
+}
+
+function getLastSeenLabel(timestamp) {
+  if (!timestamp) {
+    return "jamais";
+  }
+  return toDateTimeLabel(timestamp);
+}
+
+function startFriendsPolling() {
+  if (friendsPollingInterval) {
+    clearInterval(friendsPollingInterval);
+    friendsPollingInterval = null;
+  }
+
+  if (!authenticatedUser) {
+    return;
+  }
+
+  friendsPollingInterval = setInterval(() => {
+    refreshFriendsData();
+  }, 15000);
+}
+
+function stopFriendsPolling() {
+  if (friendsPollingInterval) {
+    clearInterval(friendsPollingInterval);
+    friendsPollingInterval = null;
   }
 }
 
@@ -1854,13 +1888,93 @@ function renderScorePages() {
     <p class="score-empty">Derniere partie: ${latestMatchText}</p>
   `;
 
-  if (lastLeaderboardEntries.length === 0) {
-    scorePageFriends.innerHTML = '<p class="score-empty">Aucun score ami pour le moment. Lance une partie en ligne.</p>';
+  if (!authenticatedUser) {
+    scorePageFriends.innerHTML = '<p class="score-empty">Connecte-toi pour ajouter des amis et voir leur statut en ligne.</p>';
   } else {
-    const rows = lastLeaderboardEntries
-      .map((entry) => `<li>${entry.name}: ${formatScore(entry.score)}/${lastLeaderboardMaxScore}</li>`)
-      .join("");
-    scorePageFriends.innerHTML = `<ol class="score-list">${rows}</ol>`;
+    const friendRows = friendsData.length > 0
+      ? friendsData
+        .map((friend) => {
+          const roomDetails = friend.currentRoomCode
+            ? ` (salon ${friend.currentRoomCode}${friend.isInMatch ? ", en partie" : ""})`
+            : "";
+          const status = friend.isOnline
+            ? `En ligne${roomDetails}`
+            : `Hors ligne (vu: ${getLastSeenLabel(friend.lastSeenAt)})`;
+          return `<li><strong>${friend.username}</strong> - ${status} - Moy: ${formatScore(friend.averageScore)}/100 - Best: ${formatScore(friend.bestRound)} - ${friend.rounds} manches</li>`;
+        })
+        .join("")
+      : '<li class="score-empty">Aucun ami ajouté pour le moment.</li>';
+
+    const roomRows = lastLeaderboardEntries.length > 0
+      ? lastLeaderboardEntries
+        .map((entry) => `<li>${entry.name}: ${formatScore(entry.score)}/${lastLeaderboardMaxScore}</li>`)
+        .join("")
+      : '<li class="score-empty">Aucune partie online active.</li>';
+
+    const incomingRows = incomingFriendRequests.length > 0
+      ? incomingFriendRequests
+        .map((request) => `<li><strong>${request.username}</strong> (${toDateTimeLabel(request.createdAt)}) <button class="btn btn-ghost" data-friend-request-action="accept" data-request-id="${request.id}" type="button">Accepter</button> <button class="btn btn-ghost" data-friend-request-action="decline" data-request-id="${request.id}" type="button">Refuser</button></li>`)
+        .join("")
+      : '<li class="score-empty">Aucune demande recue.</li>';
+
+    const outgoingRows = outgoingFriendRequests.length > 0
+      ? outgoingFriendRequests
+        .map((request) => `<li><strong>${request.username}</strong> (${toDateTimeLabel(request.createdAt)})</li>`)
+        .join("")
+      : '<li class="score-empty">Aucune demande envoyee.</li>';
+
+    scorePageFriends.innerHTML = `
+      <div class="score-history-toolbar">
+        <input id="friendUsernameInput" type="text" maxlength="20" placeholder="Pseudo ami" />
+        <button id="friendAddBtn" class="btn btn-ghost" type="button">Envoyer demande</button>
+        <button id="friendRefreshBtn" class="btn btn-ghost" type="button">Actualiser</button>
+      </div>
+      <p id="friendsStatusText" class="score-empty">${friendsData.length} ami(s) connecte(s) a ton reseau.</p>
+      <p class="score-empty" style="margin-top:0.55rem;">Demandes recues</p>
+      <ol class="score-list">${incomingRows}</ol>
+      <p class="score-empty" style="margin-top:0.55rem;">Demandes envoyees</p>
+      <ol class="score-list">${outgoingRows}</ol>
+      <p class="score-empty" style="margin-top:0.55rem;">Mes amis</p>
+      <ol class="score-list">${friendRows}</ol>
+      <p class="score-empty" style="margin-top:0.55rem;">Snapshot du salon courant</p>
+      <ol class="score-list">${roomRows}</ol>
+    `;
+
+    const friendInput = document.getElementById("friendUsernameInput");
+    const friendAddBtn = document.getElementById("friendAddBtn");
+    const friendRefreshBtn = document.getElementById("friendRefreshBtn");
+    const friendsStatusText = document.getElementById("friendsStatusText");
+
+    if (friendsStatusText) {
+      const onlineCount = friendsData.filter((friend) => friend.isOnline).length;
+      friendsStatusText.textContent = `${friendsData.length} ami(s), ${onlineCount} en ligne.`;
+    }
+
+    if (friendAddBtn) {
+      friendAddBtn.addEventListener("click", async () => {
+        const username = friendInput?.value?.trim() || "";
+        if (!username) {
+          authStatus.textContent = "Entre un pseudo ami.";
+          return;
+        }
+        await addFriend(username);
+      });
+    }
+
+    const requestActionButtons = scorePageFriends.querySelectorAll("button[data-friend-request-action]");
+    for (const button of requestActionButtons) {
+      button.addEventListener("click", async () => {
+        const requestId = Number(button.getAttribute("data-request-id") || 0);
+        const action = button.getAttribute("data-friend-request-action") || "";
+        await respondToFriendRequest(requestId, action);
+      });
+    }
+
+    if (friendRefreshBtn) {
+      friendRefreshBtn.addEventListener("click", async () => {
+        await refreshFriendsData();
+      });
+    }
   }
 
   const globalEntries = Array.isArray(persistedTracking?.global)
@@ -2025,6 +2139,10 @@ function setScorePage(nextPage) {
   scorePageFriends.classList.toggle("hidden", scorePage !== "friends");
   scorePageGlobal.classList.toggle("hidden", scorePage !== "global");
   scorePageHistory.classList.toggle("hidden", scorePage !== "history");
+
+  if (scorePage === "friends" && authenticatedUser) {
+    refreshFriendsData();
+  }
 }
 
 function closeScoreDrawer() {
@@ -2379,6 +2497,105 @@ async function refreshPersistedTracking() {
   }
 }
 
+async function refreshFriendsData() {
+  if (!authenticatedUser) {
+    friendsData = [];
+    incomingFriendRequests = [];
+    outgoingFriendRequests = [];
+    renderScorePages();
+    return;
+  }
+
+  try {
+    const previousPresence = new Map(friendsData.map((friend) => [Number(friend.id), !!friend.isOnline]));
+    const response = await fetch("/api/friends");
+    const data = await response.json();
+    if (!response.ok || !data.ok) {
+      friendsData = [];
+      incomingFriendRequests = [];
+      outgoingFriendRequests = [];
+      renderScorePages();
+      return;
+    }
+
+    friendsData = Array.isArray(data.friends) ? data.friends : [];
+    incomingFriendRequests = Array.isArray(data.incomingRequests) ? data.incomingRequests : [];
+    outgoingFriendRequests = Array.isArray(data.outgoingRequests) ? data.outgoingRequests : [];
+
+    if (hasHydratedFriendsPresence) {
+      const justOnline = friendsData
+        .filter((friend) => !!friend.isOnline && !previousPresence.get(Number(friend.id)))
+        .map((friend) => friend.username);
+
+      if (justOnline.length > 0) {
+        const message = justOnline.length === 1
+          ? `Ton ami ${justOnline[0]} est en ligne.`
+          : `Tes amis ${justOnline.join(", ")} sont en ligne.`;
+        setOnlineStatus(message);
+      }
+    }
+
+    hasHydratedFriendsPresence = true;
+    renderScorePages();
+  } catch {
+    friendsData = [];
+    incomingFriendRequests = [];
+    outgoingFriendRequests = [];
+    renderScorePages();
+  }
+}
+
+async function addFriend(username) {
+  if (!authenticatedUser) {
+    authStatus.textContent = "Connecte-toi pour ajouter des amis.";
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/friends/add", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username }),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) {
+      throw new Error(data.message || "Impossible d'ajouter cet ami.");
+    }
+
+    authStatus.textContent = `Demande envoyee a ${data.request.toUsername}`;
+    await refreshFriendsData();
+  } catch (error) {
+    authStatus.textContent = error.message || "Erreur lors de l'ajout d'ami.";
+  }
+}
+
+async function respondToFriendRequest(requestId, action) {
+  if (!authenticatedUser) {
+    authStatus.textContent = "Connecte-toi pour gerer les demandes d'amis.";
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/friends/respond", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ requestId, action }),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) {
+      throw new Error(data.message || "Impossible de traiter la demande.");
+    }
+
+    authStatus.textContent = action === "accept"
+      ? "Demande d'ami acceptee."
+      : "Demande d'ami refusee.";
+
+    await refreshFriendsData();
+  } catch (error) {
+    authStatus.textContent = error.message || "Erreur lors du traitement de la demande.";
+  }
+}
+
 async function trackSoloRound(payload) {
   if (!authenticatedUser) {
     return;
@@ -2411,6 +2628,15 @@ function setAuthenticatedUser(user) {
   } else {
     authStatus.textContent = "Non connecte.";
     persistedTracking = null;
+    friendsData = [];
+    incomingFriendRequests = [];
+    outgoingFriendRequests = [];
+    hasHydratedFriendsPresence = false;
+    stopFriendsPolling();
+  }
+
+  if (isLoggedIn) {
+    startFriendsPolling();
   }
 
   renderScorePages();
@@ -2448,6 +2674,7 @@ async function refreshAuthSession() {
     setAuthenticatedUser(data.user);
     if (data.user) {
       await refreshPersistedTracking();
+      await refreshFriendsData();
     }
   } catch {
     setAuthenticatedUser(null);
@@ -2875,6 +3102,7 @@ registerBtn.addEventListener("click", async () => {
     });
     setAuthenticatedUser(data.user);
     await refreshPersistedTracking();
+    await refreshFriendsData();
   } catch (error) {
     authStatus.textContent = error.message;
   }
@@ -2889,6 +3117,7 @@ loginBtn.addEventListener("click", async () => {
     });
     setAuthenticatedUser(data.user);
     await refreshPersistedTracking();
+    await refreshFriendsData();
   } catch (error) {
     authStatus.textContent = error.message;
   }

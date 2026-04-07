@@ -127,12 +127,40 @@ db.prepare(
   )`,
 ).run();
 
+db.prepare(
+  `CREATE TABLE IF NOT EXISTS user_friends (
+    user_id INTEGER NOT NULL,
+    friend_user_id INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (user_id, friend_user_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (friend_user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`,
+).run();
+
+db.prepare(
+  `CREATE TABLE IF NOT EXISTS user_friend_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    requester_user_id INTEGER NOT NULL,
+    recipient_user_id INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    created_at INTEGER NOT NULL,
+    responded_at INTEGER,
+    FOREIGN KEY (requester_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (recipient_user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`,
+).run();
+
 db.prepare("CREATE INDEX IF NOT EXISTS idx_round_history_user_created ON user_round_history (user_id, created_at DESC)").run();
 db.prepare("CREATE INDEX IF NOT EXISTS idx_match_history_user_created ON user_match_history (user_id, created_at DESC)").run();
 db.prepare("CREATE INDEX IF NOT EXISTS idx_activity_log_user_created ON user_activity_log (user_id, created_at DESC)").run();
 db.prepare("CREATE INDEX IF NOT EXISTS idx_sessions_expires ON user_sessions (expires_at)").run();
+db.prepare("CREATE INDEX IF NOT EXISTS idx_user_friends_friend ON user_friends (friend_user_id)").run();
+db.prepare("CREATE INDEX IF NOT EXISTS idx_friend_requests_recipient ON user_friend_requests (recipient_user_id, status)").run();
+db.prepare("CREATE INDEX IF NOT EXISTS idx_friend_requests_requester ON user_friend_requests (requester_user_id, status)").run();
 
 const authSessions = new Map();
+const activeUsers = new Map();
 
 const rooms = new Map();
 const roomTimers = new Map();
@@ -152,6 +180,56 @@ const updateSessionActivityStmt = db.prepare(
 );
 const deleteSessionStmt = db.prepare("DELETE FROM user_sessions WHERE token = ?");
 const cleanupExpiredSessionsStmt = db.prepare("DELETE FROM user_sessions WHERE expires_at < ?");
+const insertFriendStmt = db.prepare("INSERT OR IGNORE INTO user_friends (user_id, friend_user_id, created_at) VALUES (?, ?, ?)");
+const areFriendsStmt = db.prepare("SELECT 1 AS existsFlag FROM user_friends WHERE user_id = ? AND friend_user_id = ?");
+const getUserByUsernameNormStmt = db.prepare("SELECT id, username FROM users WHERE username_norm = ?");
+const getPendingFriendRequestBetweenStmt = db.prepare(
+  `SELECT id
+   FROM user_friend_requests
+   WHERE status = 'pending'
+     AND ((requester_user_id = ? AND recipient_user_id = ?) OR (requester_user_id = ? AND recipient_user_id = ?))
+   LIMIT 1`,
+);
+const insertFriendRequestStmt = db.prepare(
+  `INSERT INTO user_friend_requests (requester_user_id, recipient_user_id, status, created_at)
+   VALUES (?, ?, 'pending', ?)`,
+);
+const getIncomingFriendRequestStmt = db.prepare(
+  `SELECT r.id, r.created_at AS createdAt, u.id AS userId, u.username
+   FROM user_friend_requests r
+   JOIN users u ON u.id = r.requester_user_id
+   WHERE r.recipient_user_id = ? AND r.status = 'pending'
+   ORDER BY r.created_at DESC`,
+);
+const getOutgoingFriendRequestStmt = db.prepare(
+  `SELECT r.id, r.created_at AS createdAt, u.id AS userId, u.username
+   FROM user_friend_requests r
+   JOIN users u ON u.id = r.recipient_user_id
+   WHERE r.requester_user_id = ? AND r.status = 'pending'
+   ORDER BY r.created_at DESC`,
+);
+const getIncomingFriendRequestByIdStmt = db.prepare(
+  `SELECT id, requester_user_id AS requesterUserId, recipient_user_id AS recipientUserId
+   FROM user_friend_requests
+   WHERE id = ? AND recipient_user_id = ? AND status = 'pending'`,
+);
+const updateFriendRequestStatusStmt = db.prepare(
+  "UPDATE user_friend_requests SET status = ?, responded_at = ? WHERE id = ?",
+);
+const getFriendsStmt = db.prepare(
+  `SELECT u.id, u.username,
+          COALESCE(ROUND(AVG(h.score), 2), 0) AS averageScore,
+          COALESCE(MAX(h.score), 0) AS bestRound,
+          COUNT(h.id) AS rounds,
+          MAX(s.last_seen_at) AS lastSeenAt
+   FROM user_friends f
+   JOIN users u ON u.id = f.friend_user_id
+   LEFT JOIN user_round_history h ON h.user_id = u.id
+   LEFT JOIN user_sessions s ON s.user_id = u.id
+   WHERE f.user_id = ?
+   GROUP BY u.id, u.username
+   ORDER BY averageScore DESC, rounds DESC, u.username ASC`,
+);
 
 const insertActivityStmt = db.prepare(
   `INSERT INTO user_activity_log (user_id, event_type, metadata_json, created_at)
@@ -247,6 +325,57 @@ function logUserActivity(userId, eventType, metadata = null) {
   }
 
   insertActivityStmt.run(userId, eventType, serializedMetadata, Date.now());
+}
+
+function markUserOnline(userId) {
+  if (!userId) {
+    return;
+  }
+  const current = activeUsers.get(userId) || 0;
+  activeUsers.set(userId, current + 1);
+}
+
+function markUserOffline(userId) {
+  if (!userId) {
+    return;
+  }
+  const current = activeUsers.get(userId) || 0;
+  if (current <= 1) {
+    activeUsers.delete(userId);
+    return;
+  }
+  activeUsers.set(userId, current - 1);
+}
+
+function isUserOnline(userId) {
+  return (activeUsers.get(userId) || 0) > 0;
+}
+
+function getUserPresence(userId) {
+  const presence = {
+    isOnline: false,
+    socketCount: 0,
+    currentRoomCode: null,
+    isInMatch: false,
+  };
+
+  for (const socket of io.sockets.sockets.values()) {
+    if (socket?.data?.authUser?.userId !== userId) {
+      continue;
+    }
+
+    presence.isOnline = true;
+    presence.socketCount += 1;
+
+    const roomCode = socket.data.roomCode;
+    if (roomCode && !presence.currentRoomCode) {
+      presence.currentRoomCode = roomCode;
+      const room = rooms.get(roomCode);
+      presence.isInMatch = !!room?.matchActive;
+    }
+  }
+
+  return presence;
 }
 
 function recordRoundHistory(userId, payload) {
@@ -781,6 +910,113 @@ app.post("/api/auth/logout", (req, res) => {
   res.json({ ok: true });
 });
 
+app.get("/api/friends", requireAuth, (req, res) => {
+  const { userId } = req.authSession;
+  const friends = getFriendsStmt.all(userId).map((friend) => {
+    const presence = getUserPresence(Number(friend.id));
+    return {
+      id: friend.id,
+      username: friend.username,
+      rounds: Number(friend.rounds || 0),
+      averageScore: Number(friend.averageScore || 0),
+      bestRound: Number(friend.bestRound || 0),
+      isOnline: presence.isOnline,
+      currentRoomCode: presence.currentRoomCode,
+      isInMatch: presence.isInMatch,
+      lastSeenAt: Number(friend.lastSeenAt || 0),
+    };
+  });
+
+  const incomingRequests = getIncomingFriendRequestStmt.all(userId).map((request) => ({
+    id: Number(request.id),
+    userId: Number(request.userId),
+    username: request.username,
+    createdAt: Number(request.createdAt),
+  }));
+
+  const outgoingRequests = getOutgoingFriendRequestStmt.all(userId).map((request) => ({
+    id: Number(request.id),
+    userId: Number(request.userId),
+    username: request.username,
+    createdAt: Number(request.createdAt),
+  }));
+
+  res.json({ ok: true, friends, incomingRequests, outgoingRequests });
+});
+
+app.post("/api/friends/add", requireAuth, (req, res) => {
+  const { userId } = req.authSession;
+  const username = String(req.body?.username || "").trim();
+
+  if (!username || username.length < 3) {
+    res.status(400).json({ ok: false, message: "Pseudo ami invalide." });
+    return;
+  }
+
+  const friend = getUserByUsernameNormStmt.get(username.toLowerCase());
+  if (!friend) {
+    res.status(404).json({ ok: false, message: "Utilisateur introuvable." });
+    return;
+  }
+
+  if (Number(friend.id) === Number(userId)) {
+    res.status(400).json({ ok: false, message: "Tu ne peux pas t'ajouter toi-meme." });
+    return;
+  }
+
+  if (areFriendsStmt.get(userId, friend.id)) {
+    res.status(409).json({ ok: false, message: "Cet utilisateur est deja dans tes amis." });
+    return;
+  }
+
+  if (getPendingFriendRequestBetweenStmt.get(userId, friend.id, friend.id, userId)) {
+    res.status(409).json({ ok: false, message: "Une demande est deja en attente entre vous." });
+    return;
+  }
+
+  const now = Date.now();
+  insertFriendRequestStmt.run(userId, friend.id, now);
+
+  logUserActivity(userId, "friend_request_sent", {
+    friendUserId: friend.id,
+    friendUsername: friend.username,
+  });
+
+  res.json({ ok: true, request: { toUserId: friend.id, toUsername: friend.username } });
+});
+
+app.post("/api/friends/respond", requireAuth, (req, res) => {
+  const { userId } = req.authSession;
+  const requestId = Number(req.body?.requestId || 0);
+  const action = String(req.body?.action || "").trim().toLowerCase();
+
+  if (!requestId || !["accept", "decline"].includes(action)) {
+    res.status(400).json({ ok: false, message: "Reponse de demande invalide." });
+    return;
+  }
+
+  const request = getIncomingFriendRequestByIdStmt.get(requestId, userId);
+  if (!request) {
+    res.status(404).json({ ok: false, message: "Demande introuvable ou deja traitee." });
+    return;
+  }
+
+  const now = Date.now();
+  if (action === "accept") {
+    insertFriendStmt.run(request.requesterUserId, request.recipientUserId, now);
+    insertFriendStmt.run(request.recipientUserId, request.requesterUserId, now);
+  }
+
+  updateFriendRequestStatusStmt.run(action === "accept" ? "accepted" : "declined", now, requestId);
+
+  logUserActivity(userId, action === "accept" ? "friend_request_accepted" : "friend_request_declined", {
+    requestId,
+    requesterUserId: request.requesterUserId,
+  });
+
+  res.json({ ok: true });
+});
+
 app.get("/api/users/me/tracking", requireAuth, (req, res) => {
   const { userId } = req.authSession;
 
@@ -942,6 +1178,7 @@ io.on("connection", (socket) => {
       userId: socketSession.user_id,
       username: socketSession.username,
     };
+    markUserOnline(socketSession.user_id);
     touchSession(socketToken);
   } else {
     socket.data.authUser = null;
@@ -1155,6 +1392,10 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
+    if (socket.data.authUser?.userId) {
+      markUserOffline(socket.data.authUser.userId);
+    }
+
     const roomCode = socket.data.roomCode;
     if (!roomCode) {
       return;
