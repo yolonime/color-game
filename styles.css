@@ -174,6 +174,20 @@ body[data-theme="code"] {
   color: #fff;
 }
 
+.social-badge {
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: #d1495b;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .social-icon {
   font-size: 1.05rem;
   line-height: 1;
@@ -405,6 +419,122 @@ body[data-theme="code"] {
   gap: 0.35rem;
   max-height: 260px;
   overflow-y: auto;
+}
+
+.social-layout {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.social-section {
+  border: 1px solid rgba(31, 27, 22, 0.1);
+  border-radius: 12px;
+  padding: 0.6rem;
+  background: rgba(255, 255, 255, 0.72);
+  opacity: 0;
+  transform: translateY(8px);
+  animation: social-fade-in 260ms ease-out forwards;
+}
+
+.social-section:nth-of-type(1) {
+  animation-delay: 40ms;
+}
+
+.social-section:nth-of-type(2) {
+  animation-delay: 90ms;
+}
+
+.social-section:nth-of-type(3) {
+  animation-delay: 140ms;
+}
+
+.social-section:nth-of-type(4) {
+  animation-delay: 190ms;
+}
+
+.social-section-title {
+  margin: 0 0 0.45rem;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.social-list {
+  margin: 0;
+  padding-left: 1rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.social-list li {
+  line-height: 1.35;
+}
+
+.social-meta {
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+}
+
+.social-status-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.73rem;
+  font-weight: 800;
+  margin-right: 0.35rem;
+}
+
+.social-status-pill.online {
+  background: rgba(42, 157, 143, 0.16);
+  color: #1d7a70;
+}
+
+.social-status-pill.offline {
+  background: rgba(84, 93, 112, 0.14);
+  color: #4a5568;
+}
+
+.social-status-pill.unread {
+  background: rgba(226, 90, 53, 0.2);
+  color: #9f3f22;
+}
+
+.social-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.3rem;
+}
+
+.social-actions-row .btn {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.84rem;
+}
+
+.app-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 1.4rem;
+  transform: translateX(-50%);
+  z-index: 120;
+  max-width: min(92vw, 540px);
+  border-radius: 999px;
+  padding: 0.6rem 0.95rem;
+  background: rgba(25, 35, 41, 0.92);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.28);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.app-toast.show {
+  opacity: 1;
+  transform: translate(-50%, -6px);
 }
 
 body[data-theme="name"] .menu-drawer {
@@ -1742,6 +1872,17 @@ body[data-theme="online"] .menu-drawer {
   }
 }
 
+@keyframes social-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @media (max-width: 860px) {
   .online-grid,
   .game-card {
@@ -1766,6 +1907,11 @@ body[data-theme="online"] .menu-drawer {
     margin: 0 0 0.8rem 0.5rem;
   }
 
+  .social-btn {
+    position: static;
+    margin: 0 0 0.8rem 0.5rem;
+  }
+
   .menu-drawer {
     top: 7.8rem;
     right: 0.9rem;
@@ -1775,6 +1921,14 @@ body[data-theme="online"] .menu-drawer {
   }
 
   .score-drawer {
+    top: 7.8rem;
+    right: 0.9rem;
+    left: 0.9rem;
+    width: auto;
+    max-height: calc(100vh - 9rem);
+  }
+
+  .social-drawer {
     top: 7.8rem;
     right: 0.9rem;
     left: 0.9rem;
@@ -1793,5 +1947,45 @@ body[data-theme="online"] .menu-drawer {
   .stage-wrap,
   .stage-color {
     min-height: 260px;
+  }
+}
+
+@media (max-width: 620px) {
+  .burger-btn,
+  .trophy-btn,
+  .social-btn {
+    width: 100%;
+    justify-content: center;
+    margin: 0 0 0.55rem;
+  }
+
+  .menu-drawer,
+  .score-drawer,
+  .social-drawer {
+    top: 9.8rem;
+    right: 0.55rem;
+    left: 0.55rem;
+    max-height: calc(100vh - 10.8rem);
+    border-radius: 18px;
+    padding: 0.75rem;
+  }
+
+  .score-history-toolbar {
+    gap: 0.4rem;
+  }
+
+  .score-history-toolbar input,
+  .score-history-toolbar select {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .social-list {
+    padding-left: 0.85rem;
+  }
+
+  .social-actions-row .btn {
+    flex: 1 1 auto;
+    min-width: 0;
   }
 }

@@ -178,6 +178,17 @@ db.prepare(
   )`,
 ).run();
 
+db.prepare(
+  `CREATE TABLE IF NOT EXISTS user_dm_thread_state (
+    user_id INTEGER NOT NULL,
+    friend_user_id INTEGER NOT NULL,
+    last_read_at INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, friend_user_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (friend_user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`,
+).run();
+
 db.prepare("CREATE INDEX IF NOT EXISTS idx_round_history_user_created ON user_round_history (user_id, created_at DESC)").run();
 db.prepare("CREATE INDEX IF NOT EXISTS idx_match_history_user_created ON user_match_history (user_id, created_at DESC)").run();
 db.prepare("CREATE INDEX IF NOT EXISTS idx_activity_log_user_created ON user_activity_log (user_id, created_at DESC)").run();
@@ -188,6 +199,7 @@ db.prepare("CREATE INDEX IF NOT EXISTS idx_friend_requests_requester ON user_fri
 db.prepare("CREATE INDEX IF NOT EXISTS idx_social_invites_to_user ON user_social_invites (to_user_id, status, created_at DESC)").run();
 db.prepare("CREATE INDEX IF NOT EXISTS idx_social_invites_from_user ON user_social_invites (from_user_id, status, created_at DESC)").run();
 db.prepare("CREATE INDEX IF NOT EXISTS idx_direct_messages_users ON user_direct_messages (from_user_id, to_user_id, created_at DESC)").run();
+db.prepare("CREATE INDEX IF NOT EXISTS idx_dm_thread_state_user_friend ON user_dm_thread_state (user_id, friend_user_id)").run();
 
 const authSessions = new Map();
 const activeUsers = new Map();
@@ -290,6 +302,22 @@ const getDirectMessagesBetweenStmt = db.prepare(
    WHERE (m.from_user_id = ? AND m.to_user_id = ?) OR (m.from_user_id = ? AND m.to_user_id = ?)
    ORDER BY m.created_at DESC
    LIMIT 60`,
+);
+const getUnreadDirectMessagesByFriendStmt = db.prepare(
+  `SELECT m.from_user_id AS friendUserId,
+          COUNT(*) AS unreadCount
+   FROM user_direct_messages m
+   LEFT JOIN user_dm_thread_state t
+     ON t.user_id = ? AND t.friend_user_id = m.from_user_id
+   WHERE m.to_user_id = ?
+     AND m.created_at > COALESCE(t.last_read_at, 0)
+   GROUP BY m.from_user_id`,
+);
+const upsertThreadReadStateStmt = db.prepare(
+  `INSERT INTO user_dm_thread_state (user_id, friend_user_id, last_read_at)
+   VALUES (?, ?, ?)
+   ON CONFLICT(user_id, friend_user_id)
+   DO UPDATE SET last_read_at = excluded.last_read_at`,
 );
 const getFriendsStmt = db.prepare(
   `SELECT u.id, u.username,
@@ -994,6 +1022,9 @@ app.post("/api/auth/logout", (req, res) => {
 
 app.get("/api/friends", requireAuth, (req, res) => {
   const { userId } = req.authSession;
+  const unreadRows = getUnreadDirectMessagesByFriendStmt.all(userId, userId);
+  const unreadByFriend = new Map(unreadRows.map((row) => [Number(row.friendUserId), Number(row.unreadCount || 0)]));
+
   const friends = getFriendsStmt.all(userId).map((friend) => {
     const presence = getUserPresence(Number(friend.id));
     return {
@@ -1005,6 +1036,7 @@ app.get("/api/friends", requireAuth, (req, res) => {
       isOnline: presence.isOnline,
       currentRoomCode: presence.currentRoomCode,
       isInMatch: presence.isInMatch,
+      unreadCount: Number(unreadByFriend.get(Number(friend.id)) || 0),
       lastSeenAt: Number(friend.lastSeenAt || 0),
     };
   });
@@ -1202,6 +1234,8 @@ app.get("/api/social/messages/:friendUserId", requireAuth, (req, res) => {
       createdAt: Number(entry.createdAt),
       isMine: Number(entry.fromUserId) === Number(userId),
     }));
+
+  upsertThreadReadStateStmt.run(userId, friendUserId, Date.now());
 
   res.json({ ok: true, messages });
 });

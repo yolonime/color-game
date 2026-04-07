@@ -60,6 +60,7 @@
       <button id="socialBtn" class="social-btn" type="button" aria-expanded="false" aria-controls="socialDrawer" aria-label="Ouvrir le social">
         <span class="social-icon" aria-hidden="true">👥</span>
         <span class="social-label">Social</span>
+        <span id="socialBadge" class="social-badge hidden" aria-live="polite">0</span>
       </button>
       <p id="modeEyebrow" class="eyebrow">Mode 1</p>
       <h1 id="brandTitle" class="brand-title" role="button" tabindex="0" aria-pressed="false">Color Guesser</h1>
@@ -441,6 +442,8 @@
       </div>
     </section>
   </main>
+
+  <div id="appToast" class="app-toast hidden" role="status" aria-live="polite"></div>
 
   <!-- Socket.IO: Try server first, fallback to CDN -->
   <script src="/socket.io/socket.io.js"></script>
