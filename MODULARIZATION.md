@@ -67,12 +67,14 @@ src/
 - [x] `dom.js` - Cache DOM centralisé
 - [x] `game-state.js` - État global
 - [x] `app.js` - Documentationstructure
+- **Statut**: Complétée - ES6 modules, entry point en index.js
 
 ### Phase 2 : Utilitaires ⏳
-- `color/conversion.js` - Conversions couleur (hslToRgb, rgbToHsl, hexToRgb, etc)
-- `color/distance.js` - Calcul score basé distance
-- `color/named-colors.js` - buildNamedColors, pickNamedColor, refillPool
-- `code/management.js` - Parsing, sync code inputs
+- [x] `color/conversion.js` - Conversions couleur (hslToRgb, rgbToHsl, hexToRgb, etc)
+- [x] `color/distance.js` - Calcul score basé distance
+- [x] `color/named-colors.js` - buildNamedColors, pickNamedColor, refillPool
+- [x] `color/parsing.js` - Parsing input codes couleur
+- **Statut**: Modules créés avec ES6 exports, exposés via window.ColorGuesser.Color
 
 ### Phase 3 : Système Métier ⏳
 - `score/system.js` - Scoring, animations, tiers

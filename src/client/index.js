@@ -15,12 +15,24 @@ import * as Constants from './constants.js';
 import { DOM } from './dom.js';
 import * as GameState from './game-state.js';
 
+// ====== COLOR UTILITIES (Phase 2) ======
+import * as ColorConversion from './color/conversion.js';
+import * as ColorParsing from './color/parsing.js';
+import * as ColorDistance from './color/distance.js';
+import * as NamedColors from './color/named-colors.js';
+
 // ====== Expose au contexte global pour rétro-compatibilité ======
 // Cela permet d'utiliser les modules préparés pendant que script.js reste le moteur principal.
 window.ColorGuesser = window.ColorGuesser || {};
 window.ColorGuesser.Constants = Constants;
 window.ColorGuesser.DOM = DOM;
 window.ColorGuesser.GameState = GameState;
+window.ColorGuesser.Color = {
+  conversion: ColorConversion,
+  parsing: ColorParsing,
+  distance: ColorDistance,
+  namedColors: NamedColors,
+};
 
 function loadLegacyScript() {
 	return new Promise((resolve, reject) => {
