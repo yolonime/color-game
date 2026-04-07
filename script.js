@@ -109,6 +109,10 @@ const registerBtn = document.getElementById("registerBtn");
 const loginBtn = document.getElementById("loginBtn");
 const logoutBtn = document.getElementById("logoutBtn");
 const authStatus = document.getElementById("authStatus");
+const accountIdentityCard = document.getElementById("accountIdentityCard");
+const accountAvatar = document.getElementById("accountAvatar");
+const accountName = document.getElementById("accountName");
+const accountPresence = document.getElementById("accountPresence");
 
 const playerNameInput = document.getElementById("playerNameInput");
 const roomCodeInput = document.getElementById("roomCodeInput");
@@ -262,6 +266,39 @@ function showToast(message) {
     appToast.classList.add("hidden");
     toastTimeout = null;
   }, 2600);
+}
+
+function buildAvatarStyleFromUsername(username) {
+  const safe = String(username || "Invite");
+  let hash = 0;
+  for (let i = 0; i < safe.length; i += 1) {
+    hash = ((hash << 5) - hash) + safe.charCodeAt(i);
+    hash |= 0;
+  }
+
+  const hue = Math.abs(hash) % 360;
+  const hue2 = (hue + 28) % 360;
+  return `linear-gradient(135deg, hsl(${hue}, 62%, 48%), hsl(${hue2}, 66%, 40%))`;
+}
+
+function updateAccountIdentityUi() {
+  if (!accountAvatar || !accountName || !accountPresence || !accountIdentityCard) {
+    return;
+  }
+
+  const isLoggedIn = !!authenticatedUser;
+  const username = isLoggedIn ? authenticatedUser.username : "Invite";
+  const initial = String(username).trim().charAt(0).toUpperCase() || "?";
+
+  accountAvatar.textContent = initial;
+  accountAvatar.style.background = isLoggedIn
+    ? buildAvatarStyleFromUsername(username)
+    : "linear-gradient(135deg, #8a979f, #67757d)";
+
+  accountName.textContent = username;
+  accountPresence.textContent = isLoggedIn ? "Connecte" : "Hors ligne";
+  accountPresence.classList.toggle("online", isLoggedIn);
+  accountIdentityCard.setAttribute("aria-label", isLoggedIn ? `Compte connecte: ${username}` : "Aucun compte connecte");
 }
 
 function updateSocialBadge() {
@@ -3037,6 +3074,8 @@ function setAuthenticatedUser(user) {
     updateSocialBadge();
   }
 
+  updateAccountIdentityUi();
+
   renderScorePages();
   renderSocialPanel();
 }
@@ -3658,6 +3697,7 @@ inlineCodeFormatHslBtn.addEventListener("click", () => {
 
 updatePlayerPreview();
 setNameModeDifficulty("normal");
+updateAccountIdentityUi();
 // Initialise l'app une fois que les données de couleurs sont chargées
 (async () => {
   await loadNamedColorData();
