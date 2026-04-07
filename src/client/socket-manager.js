@@ -15,27 +15,57 @@ let socketEventHandlers = {};
 /**
  * Initialize socket.io connection
  * Uses io object from global scope (window.io)
- * @returns {Object} Socket instance
+ * Waits for io to be available (loaded from server or CDN)
+ * @returns {Promise<Object>} Socket instance
  */
-export function initializeSocket() {
-  // Check if io is available globally (loaded from server or CDN)
-  if (typeof window === 'undefined' || !window.io) {
-    console.warn('⚠️  Socket.IO not available. Server may not be running.');
-    return null;
-  }
+export async function initializeSocket() {
+  return new Promise((resolve, reject) => {
+    // If already connected, return immediately
+    if (socket && socket.connected) {
+      resolve(socket);
+      return;
+    }
 
-  if (socket && socket.connected) {
-    return socket;
-  }
+    // Check if io is available globally
+    if (typeof window !== 'undefined' && window.io) {
+      try {
+        socket = window.io();
+        registerDefaultListeners();
+        resolve(socket);
+      } catch (error) {
+        console.error('❌ Failed to initialize socket:', error);
+        reject(error);
+      }
+      return;
+    }
 
-  try {
-    socket = window.io();
-    registerDefaultListeners();
-    return socket;
-  } catch (error) {
-    console.error('❌ Failed to initialize socket:', error);
-    return null;
-  }
+    // Wait for io to be loaded (up to 5 seconds)
+    let attemptCount = 0;
+    const maxAttempts = 50; // 50 * 100ms = 5 seconds
+    
+    const waitForIo = setInterval(() => {
+      attemptCount++;
+      
+      if (typeof window !== 'undefined' && window.io) {
+        clearInterval(waitForIo);
+        try {
+          socket = window.io();
+          registerDefaultListeners();
+          resolve(socket);
+        } catch (error) {
+          console.error('❌ Failed to initialize socket:', error);
+          reject(error);
+        }
+        return;
+      }
+      
+      if (attemptCount >= maxAttempts) {
+        clearInterval(waitForIo);
+        console.warn('⚠️  Socket.IO not available after 5 seconds. App will run without socket.');
+        resolve(null);
+      }
+    }, 100);
+  });
 }
 
 /**

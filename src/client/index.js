@@ -79,20 +79,39 @@ function loadLegacyScript() {
 			return;
 		}
 
-		const legacyScript = document.createElement('script');
-		legacyScript.src = 'script.js';
-		legacyScript.async = false;
-		legacyScript.onload = () => {
-			window.__colorGuesserLegacyLoaded = true;
-			resolve();
+		// Wait for DOM to be fully ready before loading script.js
+		const loadWhenReady = () => {
+			const legacyScript = document.createElement('script');
+			legacyScript.src = 'script.js';
+			legacyScript.async = false;
+			legacyScript.onload = () => {
+				window.__colorGuesserLegacyLoaded = true;
+				resolve();
+			};
+			legacyScript.onerror = () => reject(new Error('Impossible de charger script.js'));
+			document.body.appendChild(legacyScript);
 		};
-		legacyScript.onerror = () => reject(new Error('Impossible de charger script.js'));
-		document.body.appendChild(legacyScript);
+
+		// Load script.js only after DOM is ready and all modules are initialized
+		if (document.readyState === 'loading') {
+			document.addEventListener('DOMContentLoaded', loadWhenReady);
+		} else {
+			loadWhenReady();
+		}
 	});
 }
 
 loadLegacyScript().catch((error) => {
-	console.error(error);
+	console.error('❌ Failed to load legacy script:', error);
 });
 
 console.log('✅ Color Guesser client modules loaded', window.ColorGuesser);
+
+// Ensure DOM is ready before anything critical
+if (document.readyState === 'loading') {
+	document.addEventListener('DOMContentLoaded', () => {
+		console.log('🎮 DOM ready - game initialized');
+	});
+} else {
+	console.log('🎮 DOM already ready - game initialized');
+}
