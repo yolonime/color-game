@@ -90,9 +90,10 @@ src/
 - **Statut**: Modules créés, exposés via window.ColorGuesser.UI
 
 ### Phase 5 : Logique Jeu ⏳
-- `game/solo.js` - beginRound, scoreGuess, startSoloMatchOrNextRound
-- `game/online.js` - leaveOnlineSession, runReveal, handleOnlineResult
-- `converter/index.js` - initColorConverter, renderConverterFromHsl
+- [x] `game/solo.js` - calculateColorScore, startSoloMatch, advanceSoloRound, recordRoundScore, isSoloMatchComplete, getSoloMatchSummary, formatRoundHeader, getRoundResultMessage, getStageModeMessage, getStageModeBackground, getHiddenStageBackground
+- [x] `game/online.js` - initializeOnlineMatch, startOnlineRound, submitOnlineRound, markPlayerReady, allPlayersReady, isOnlineMatchComplete, leaveOnlineRoom, getOnlineWaitingMessage, formatOnlineLeaderboard, updatePlayersList
+- [x] `converter/index.js` - updateConverterDisplay, updateConverterGradientBars, copyToClipboard, formatRgbString, formatHslString, getConverterHintText, getInitialConverterState
+- **Statut**: Modules logique créés, exposés via window.ColorGuesser.Game et window.ColorGuesser.Converter
 
 ### Phase 6 : Réseau & Événements ⏳
 - `auth.js` - authRequest, refreshAuthSession, setAuthenticatedUser

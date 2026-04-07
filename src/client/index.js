@@ -30,6 +30,11 @@ import * as UIHelpers from './ui/helpers.js';
 import * as UIUpdater from './ui/updater.js';
 import * as UIMenu from './ui/menu.js';
 
+// ====== GAME LOGIC (Phase 5) ======
+import * as GameSolo from './game/solo.js';
+import * as GameOnline from './game/online.js';
+import * as Converter from './converter/index.js';
+
 // ====== Expose au contexte global pour rétro-compatibilité ======
 // Cela permet d'utiliser les modules préparés pendant que script.js reste le moteur principal.
 window.ColorGuesser = window.ColorGuesser || {};
@@ -53,6 +58,11 @@ window.ColorGuesser.UI = {
   updater: UIUpdater,
   menu: UIMenu,
 };
+window.ColorGuesser.Game = {
+  solo: GameSolo,
+  online: GameOnline,
+};
+window.ColorGuesser.Converter = Converter;
 
 function loadLegacyScript() {
 	return new Promise((resolve, reject) => {
