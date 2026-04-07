@@ -174,6 +174,7 @@ let currentRoomCode = "";
 let isHost = false;
 let hasSubmittedOnline = false;
 let onlineChatHistory = [];
+let lastLeaderboardMaxScore = MATCH_ROUNDS * 100;
 
 let namedColorPool = [];
 let lastSoloRandomTarget = null;
@@ -863,7 +864,10 @@ function renderStageScore(value) {
   const nextTier = getScoreVisualTier(value);
   const tierChanged = stageScoreTierId !== nextTier.id;
   stageScoreTierId = nextTier.id;
-  applyStageTier(nextTier, tierChanged);
+    applyStageTier(nextTier, tierChanged);
+    if (value >= 90) {
+      playScorePopSound();
+    }
 }
 
 function restartStageScoreAnimation() {
@@ -1723,7 +1727,7 @@ function renderScorePages() {
     scorePageFriends.innerHTML = '<p class="score-empty">Aucun score ami pour le moment. Lance une partie en ligne.</p>';
   } else {
     const rows = lastLeaderboardEntries
-      .map((entry) => `<li>${entry.name}: ${formatScore(entry.score)}/100</li>`)
+      .map((entry) => `<li>${entry.name}: ${formatScore(entry.score)}/${lastLeaderboardMaxScore}</li>`)
       .join("");
     scorePageFriends.innerHTML = `<ol class="score-list">${rows}</ol>`;
   }
@@ -2010,12 +2014,13 @@ function renderPlayers(players) {
   }
 }
 
-function renderLeaderboard(entries) {
+function renderLeaderboard(entries, maxScore = MATCH_ROUNDS * 100) {
+  lastLeaderboardMaxScore = maxScore;
   lastLeaderboardEntries = entries.map((entry) => ({ ...entry }));
   leaderboardList.innerHTML = "";
   for (const entry of entries) {
     const item = document.createElement("li");
-    item.textContent = `${entry.name}: ${formatScore(entry.score)}/100`;
+    item.textContent = `${entry.name}: ${formatScore(entry.score)}/${maxScore}`;
     leaderboardList.appendChild(item);
   }
 
@@ -2152,8 +2157,16 @@ function runReveal(target, revealMode = gameMode === "online" ? onlineMode : loc
     if (remaining <= 0) {
       clearInterval(countdownInterval);
       stageOverlay.classList.remove("passive");
-      stageOverlay.textContent = revealConfig.stageHidden;
-      stageColor.style.background = "repeating-linear-gradient(135deg, #e9ddc7 0 12px, #f8f1e4 12px 24px)";
+      if (revealMode === "name") {
+        stageOverlay.innerHTML = `<div class="name-mode-card"><span>Nom couleur</span><strong>${target.name}</strong><p>Reproduis la couleur.</p></div>`;
+      } else if (revealMode === "code") {
+        stageOverlay.innerHTML = `<div class="name-mode-card"><span>${target.codeFormat || getCodeFormatLabel(codeModeFormat)}</span><strong>${target.code}</strong><p>Reproduis la couleur.</p></div>`;
+      } else {
+        stageOverlay.textContent = revealConfig.stageHidden;
+      }
+      stageColor.style.background = revealMode === "name" || revealMode === "code"
+        ? stageColor.style.background
+        : "repeating-linear-gradient(135deg, #e9ddc7 0 12px, #f8f1e4 12px 24px)";
       countdown.textContent = "A toi";
       setSlidersEnabled(true);
     }
@@ -2189,6 +2202,8 @@ function handleOnlineResult(payload) {
     }
   }
 
+  const matchMaxScore = (payload.maxRounds || onlineTotalRounds || MATCH_ROUNDS) * 100;
+
   targetSwatch.style.background = hsl(payload.target.hue, payload.target.tint, payload.target.lightness);
   guessSwatch.style.background = hsl(guess.hue, guess.tint, guess.lightness);
 
@@ -2217,7 +2232,7 @@ function handleOnlineResult(payload) {
 
   renderRoundHistory(onlineRoundHistory);
   result.classList.remove("hidden");
-  renderLeaderboard(payload.leaderboard);
+  renderLeaderboard(payload.leaderboard, matchMaxScore);
 
   stageColor.style.background = hsl(payload.target.hue, payload.target.tint, payload.target.lightness);
 
@@ -2264,6 +2279,9 @@ if (socket) {
     onlineRoundNumber = 0;
     onlineTotalRounds = maxRounds || MATCH_ROUNDS;
     onlineRoundHistory = [];
+    clearMatchResultUi();
+    setSlidersEnabled(false);
+    renderLeaderboard([], onlineTotalRounds * 100);
     setOnlineStatus(`Partie online lancee (${onlineTotalRounds} manches).`);
     updateMenuButtons();
   });
@@ -2286,9 +2304,15 @@ if (socket) {
   socket.on("guess_phase", () => {
     hasSubmittedOnline = false;
     stageOverlay.classList.remove("passive");
-    stageOverlay.textContent = gameMode === "online"
-      ? getOnlineModeConfig().stageHidden
-      : getLocalModeConfig().stageHidden;
+    if (gameMode === "online" && targetColor && onlineMode === "name" && targetColor.name) {
+      stageOverlay.innerHTML = `<div class="name-mode-card"><span>Nom couleur</span><strong>${targetColor.name}</strong><p>Reproduis la couleur.</p></div>`;
+    } else if (gameMode === "online" && targetColor && onlineMode === "code" && targetColor.code) {
+      stageOverlay.innerHTML = `<div class="name-mode-card"><span>${targetColor.codeFormat || getCodeFormatLabel(onlineCodeFormat)}</span><strong>${targetColor.code}</strong><p>Reproduis la couleur.</p></div>`;
+    } else {
+      stageOverlay.textContent = gameMode === "online"
+        ? getOnlineModeConfig().stageHidden
+        : getLocalModeConfig().stageHidden;
+    }
     stageColor.style.background = "repeating-linear-gradient(135deg, #e9ddc7 0 12px, #f8f1e4 12px 24px)";
     countdown.textContent = "A toi";
     setSlidersEnabled(true);
@@ -2314,13 +2338,13 @@ if (socket) {
 
   socket.on("round_result_broadcast", ({ target, leaderboard }) => {
     targetColor = target;
-    renderLeaderboard(leaderboard);
+    renderLeaderboard(leaderboard, onlineTotalRounds * 100);
   });
 
   socket.on("match_finished", ({ leaderboard, maxRounds }) => {
     isOnlineMatchRunning = false;
     onlineRoundNumber = maxRounds || MATCH_ROUNDS;
-    renderLeaderboard(leaderboard);
+    renderLeaderboard(leaderboard, (maxRounds || MATCH_ROUNDS) * 100);
     setOnlineStatus("Partie online terminee. Le host peut relancer depuis le menu.");
     updateMenuButtons();
   });
