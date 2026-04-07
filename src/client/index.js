@@ -25,6 +25,11 @@ import * as NamedColors from './color/named-colors.js';
 import * as ModeConfig from './mode/config.js';
 import * as ScoreSystem from './score/system.js';
 
+// ====== UI & UX (Phase 4) ======
+import * as UIHelpers from './ui/helpers.js';
+import * as UIUpdater from './ui/updater.js';
+import * as UIMenu from './ui/menu.js';
+
 // ====== Expose au contexte global pour rétro-compatibilité ======
 // Cela permet d'utiliser les modules préparés pendant que script.js reste le moteur principal.
 window.ColorGuesser = window.ColorGuesser || {};
@@ -42,6 +47,11 @@ window.ColorGuesser.Mode = {
 };
 window.ColorGuesser.Score = {
   system: ScoreSystem,
+};
+window.ColorGuesser.UI = {
+  helpers: UIHelpers,
+  updater: UIUpdater,
+  menu: UIMenu,
 };
 
 function loadLegacyScript() {

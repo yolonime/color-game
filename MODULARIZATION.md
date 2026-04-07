@@ -84,9 +84,10 @@ src/
 - **Statut**: Modules utilitaires créés, mode manager à faire (contient logique complexe)
 
 ### Phase 4 : UI & UX ⏳
-- `ui/updater.js` - updatePlayerPreview, updateSliderImpactBars, updateModeCopy, etc
-- `ui/menu.js` - toggleMenu, toggleScoreDrawer, renderPlayers, renderLeaderboard
-- `ui/helpers.js` - clamp, wrapHue, pulseButton, nuages
+- [x] `ui/updater.js` - updatePlayerPreview, updateSliderImpactBars, updateGuessCodeUi, syncGuessCodeFromSliders, applyGuessCodeInput, setSlidersEnabled
+- [x] `ui/menu.js` - toggleMenu, toggleScoreDrawer, renderPlayers, renderLeaderboard, updateMenuButtons, updateSelectedModeButtons
+- [x] `ui/helpers.js` - pulseButton, nudgeElement, setElementVisibility, setElementsDisabled, updateActiveButton
+- **Statut**: Modules créés, exposés via window.ColorGuesser.UI
 
 ### Phase 5 : Logique Jeu ⏳
 - `game/solo.js` - beginRound, scoreGuess, startSoloMatchOrNextRound
