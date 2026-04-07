@@ -71,9 +71,11 @@ const scoreCloseBtn = document.getElementById("scoreCloseBtn");
 const scoreTabPersoBtn = document.getElementById("scoreTabPersoBtn");
 const scoreTabFriendsBtn = document.getElementById("scoreTabFriendsBtn");
 const scoreTabGlobalBtn = document.getElementById("scoreTabGlobalBtn");
+const scoreTabHistoryBtn = document.getElementById("scoreTabHistoryBtn");
 const scorePagePerso = document.getElementById("scorePagePerso");
 const scorePageFriends = document.getElementById("scorePageFriends");
 const scorePageGlobal = document.getElementById("scorePageGlobal");
+const scorePageHistory = document.getElementById("scorePageHistory");
 
 const nameDifficultySection = document.getElementById("nameDifficultySection");
 const difficultyEasyBtn = document.getElementById("difficultyEasyBtn");
@@ -109,6 +111,7 @@ const roomCodeInput = document.getElementById("roomCodeInput");
 const createRoomBtn = document.getElementById("createRoomBtn");
 const joinRoomBtn = document.getElementById("joinRoomBtn");
 const copyRoomCodeBtn = document.getElementById("copyRoomCodeBtn");
+const changeRoomBtn = document.getElementById("changeRoomBtn");
 const onlineStatus = document.getElementById("onlineStatus");
 const roomInfo = document.getElementById("roomInfo");
 const playersList = document.getElementById("playersList");
@@ -190,6 +193,10 @@ let isUpdatingConverter = false;
 let isUpdatingGuessCode = false;
 let appView = "game";
 let authenticatedUser = null;
+let persistedTracking = null;
+let historySourceFilter = "all";
+let historyModeFilter = "all";
+let historyPeriodFilter = "30d";
 
 const personalStats = {
   rounds: 0,
@@ -198,6 +205,22 @@ const personalStats = {
   soloMatches: 0,
   onlineRounds: 0,
 };
+
+function toDateTimeLabel(timestamp) {
+  if (!timestamp) {
+    return "-";
+  }
+  try {
+    return new Date(Number(timestamp)).toLocaleString("fr-FR", {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return "-";
+  }
+}
 
 const socket = typeof io === "function" ? io() : null;
 
@@ -1179,6 +1202,19 @@ function updateOnlineRoomUi() {
       copyRoomCodeBtn.classList.add("hidden");
       copyRoomCodeBtn.disabled = true;
     }
+    if (changeRoomBtn) {
+      changeRoomBtn.classList.add("hidden");
+      changeRoomBtn.disabled = true;
+    }
+    if (createRoomBtn) {
+      createRoomBtn.disabled = false;
+    }
+    if (joinRoomBtn) {
+      joinRoomBtn.disabled = false;
+    }
+    if (roomCodeInput) {
+      roomCodeInput.disabled = false;
+    }
     if (heroOnlinePanel) {
       heroOnlinePanel.classList.add("hidden");
       heroOnlinePanel.style.display = "none";
@@ -1211,6 +1247,21 @@ function updateOnlineRoomUi() {
   if (copyRoomCodeBtn) {
     copyRoomCodeBtn.classList.toggle("hidden", !hasRoom);
     copyRoomCodeBtn.disabled = !hasRoom;
+  }
+
+  if (changeRoomBtn) {
+    changeRoomBtn.classList.toggle("hidden", !hasRoom);
+    changeRoomBtn.disabled = !hasRoom;
+  }
+
+  if (createRoomBtn) {
+    createRoomBtn.disabled = hasRoom;
+  }
+  if (joinRoomBtn) {
+    joinRoomBtn.disabled = hasRoom;
+  }
+  if (roomCodeInput) {
+    roomCodeInput.disabled = hasRoom;
   }
 
   if (heroOnlinePanel) {
@@ -1290,6 +1341,41 @@ function leaveOnlineSession() {
   updateOnlineRoomUi();
   updateOnlineModeUi();
   updateMenuButtons();
+
+  if (authenticatedUser && payload.matchFinished) {
+    refreshPersistedTracking();
+  }
+}
+
+function changeOnlineRoom() {
+  if (!currentRoomCode) {
+    setOnlineStatus("Aucun salon actif. Cree ou rejoins un salon.");
+    return;
+  }
+
+  if (socket) {
+    socket.emit("leave_room");
+  }
+
+  currentRoomCode = "";
+  isHost = false;
+  onlinePlayersCount = 0;
+  onlineTotalRounds = MATCH_ROUNDS;
+  resetOnlineMatchState();
+  resetOnlineScoreHistory();
+  clearMatchResultUi();
+  playersList.innerHTML = "";
+  leaderboardList.innerHTML = "";
+  onlineChatHistory = [];
+  renderRoomChat([]);
+  renderScorePages();
+  updateOnlineRoomUi();
+  updateMenuButtons();
+  setOnlineStatus("Salon quitte. Tu peux rejoindre ou creer un nouveau salon.");
+  if (roomCodeInput) {
+    roomCodeInput.value = "";
+    roomCodeInput.focus();
+  }
 }
 
 function setOnlineCodeFormat(nextFormat, { syncRoom = true } = {}) {
@@ -1746,14 +1832,26 @@ function closeMenu() {
 }
 
 function renderScorePages() {
-  const personalAverage = personalStats.rounds > 0 ? personalStats.totalScore / personalStats.rounds : 0;
+  const localPersonalAverage = personalStats.rounds > 0 ? personalStats.totalScore / personalStats.rounds : 0;
+  const stats = persistedTracking?.stats || null;
+  const personalAverage = stats ? Number(stats.averageScore || 0) : localPersonalAverage;
+  const bestRound = stats ? Number(stats.bestRound || 0) : personalStats.bestRound;
+  const roundsCount = stats ? Number(stats.rounds || 0) : personalStats.rounds;
+  const soloRounds = stats ? Number(stats.soloRounds || 0) : personalStats.soloMatches;
+
+  const latestMatch = persistedTracking?.matches?.[0] || null;
+  const latestMatchText = latestMatch
+    ? `${latestMatch.source === "online" ? "Online" : "Solo"} ${latestMatch.mode} - ${formatScore(latestMatch.totalScore)} pts (${toDateTimeLabel(latestMatch.createdAt)})`
+    : "Aucune partie historisee.";
+
   scorePagePerso.innerHTML = `
     <div class="score-metric-grid">
       <article class="score-metric"><p class="score-metric-label">Moyenne perso</p><p class="score-metric-value">${formatScore(personalAverage)}/100</p></article>
-      <article class="score-metric"><p class="score-metric-label">Meilleure manche</p><p class="score-metric-value">${formatScore(personalStats.bestRound)}</p></article>
-      <article class="score-metric"><p class="score-metric-label">Manches jouées</p><p class="score-metric-value">${personalStats.rounds}</p></article>
-      <article class="score-metric"><p class="score-metric-label">Parties solo</p><p class="score-metric-value">${personalStats.soloMatches}</p></article>
+      <article class="score-metric"><p class="score-metric-label">Meilleure manche</p><p class="score-metric-value">${formatScore(bestRound)}</p></article>
+      <article class="score-metric"><p class="score-metric-label">Manches jouees</p><p class="score-metric-value">${roundsCount}</p></article>
+      <article class="score-metric"><p class="score-metric-label">Manches solo</p><p class="score-metric-value">${soloRounds}</p></article>
     </div>
+    <p class="score-empty">Derniere partie: ${latestMatchText}</p>
   `;
 
   if (lastLeaderboardEntries.length === 0) {
@@ -1765,22 +1863,155 @@ function renderScorePages() {
     scorePageFriends.innerHTML = `<ol class="score-list">${rows}</ol>`;
   }
 
-  const globalBase = [
-    ...lastLeaderboardEntries,
-    { name: getPlayerName(), score: personalAverage || 0 },
-    { name: "PixelFox", score: 96.2 },
-    { name: "HueMaster", score: 93.4 },
-    { name: "ColorNinja", score: 91.7 },
-    { name: "SaturationPro", score: 88.9 },
-  ];
+  const globalEntries = Array.isArray(persistedTracking?.global)
+    ? persistedTracking.global
+    : [];
 
-  const globalRows = Array.from(new Map(globalBase.map((entry) => [entry.name, entry])).values())
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 8)
-    .map((entry) => `<li>${entry.name}: ${formatScore(entry.score)}/100</li>`)
-    .join("");
+  if (globalEntries.length === 0) {
+    scorePageGlobal.innerHTML = '<p class="score-empty">Classement global indisponible. Connecte-toi et joue quelques manches.</p>';
+  } else {
+    const globalRows = globalEntries
+      .map((entry) => `<li>${entry.username}: ${formatScore(entry.averageScore)}/100 (${entry.rounds} manches)</li>`)
+      .join("");
+    scorePageGlobal.innerHTML = `<ol class="score-list">${globalRows}</ol>`;
+  }
 
-  scorePageGlobal.innerHTML = `<ol class="score-list">${globalRows}</ol>`;
+  const roundHistoryEntries = Array.isArray(persistedTracking?.rounds)
+    ? persistedTracking.rounds
+    : [];
+
+  scorePageHistory.innerHTML = `
+    <div class="score-history-controls">
+      <select id="historySourceSelect" aria-label="Filtrer par source">
+        <option value="all" ${historySourceFilter === "all" ? "selected" : ""}>Toutes sources</option>
+        <option value="solo" ${historySourceFilter === "solo" ? "selected" : ""}>Solo</option>
+        <option value="online" ${historySourceFilter === "online" ? "selected" : ""}>Online</option>
+      </select>
+      <select id="historyModeSelect" aria-label="Filtrer par mode">
+        <option value="all" ${historyModeFilter === "all" ? "selected" : ""}>Tous modes</option>
+        <option value="memory" ${historyModeFilter === "memory" ? "selected" : ""}>Memoire</option>
+        <option value="name" ${historyModeFilter === "name" ? "selected" : ""}>Nom couleur</option>
+        <option value="code" ${historyModeFilter === "code" ? "selected" : ""}>Code</option>
+      </select>
+      <select id="historyPeriodSelect" aria-label="Filtrer par periode">
+        <option value="7d" ${historyPeriodFilter === "7d" ? "selected" : ""}>7 jours</option>
+        <option value="30d" ${historyPeriodFilter === "30d" ? "selected" : ""}>30 jours</option>
+        <option value="all" ${historyPeriodFilter === "all" ? "selected" : ""}>Tout</option>
+      </select>
+    </div>
+    <div class="score-history-toolbar">
+      <p id="historyCount" class="score-empty"></p>
+      <button id="historyExportBtn" class="btn btn-ghost" type="button">Exporter CSV</button>
+    </div>
+    <ol id="historyRoundsList" class="score-history-list"></ol>
+  `;
+
+  const sourceSelect = document.getElementById("historySourceSelect");
+  const modeSelect = document.getElementById("historyModeSelect");
+  const periodSelect = document.getElementById("historyPeriodSelect");
+  const exportBtn = document.getElementById("historyExportBtn");
+  const list = document.getElementById("historyRoundsList");
+  const count = document.getElementById("historyCount");
+
+  const now = Date.now();
+  const periodLimitMs = historyPeriodFilter === "7d"
+    ? 7 * 24 * 60 * 60 * 1000
+    : historyPeriodFilter === "30d"
+      ? 30 * 24 * 60 * 60 * 1000
+      : null;
+
+  const filteredRounds = roundHistoryEntries.filter((entry) => {
+    const sourceOk = historySourceFilter === "all" || entry.source === historySourceFilter;
+    const modeOk = historyModeFilter === "all" || entry.mode === historyModeFilter;
+    const periodOk = periodLimitMs === null || (now - Number(entry.createdAt || 0)) <= periodLimitMs;
+    return sourceOk && modeOk && periodOk;
+  });
+
+  count.textContent = `${filteredRounds.length} manche(s) historisee(s)`;
+
+  if (filteredRounds.length === 0) {
+    const item = document.createElement("li");
+    item.className = "score-empty";
+    item.textContent = "Aucune manche pour les filtres actuels.";
+    list.appendChild(item);
+  } else {
+    for (const round of filteredRounds) {
+      const item = document.createElement("li");
+      const sourceLabel = round.source === "online" ? "Online" : "Solo";
+      const modeLabel = ONLINE_MODE_LABELS[round.mode] || round.mode;
+      const labelText = round.label ? ` | ${round.label}` : "";
+      item.textContent = `${toDateTimeLabel(round.createdAt)} - ${sourceLabel}/${modeLabel} - ${formatScore(round.score)}/100${labelText}`;
+      list.appendChild(item);
+    }
+  }
+
+  const toCsvValue = (value) => {
+    const raw = String(value ?? "");
+    return `"${raw.replace(/"/g, '""')}"`;
+  };
+
+  const exportHistoryCsv = () => {
+    if (filteredRounds.length === 0) {
+      setOnlineStatus("Aucune ligne a exporter pour ces filtres.");
+      return;
+    }
+
+    const header = [
+      "createdAt",
+      "source",
+      "mode",
+      "roomCode",
+      "roundNumber",
+      "maxRounds",
+      "score",
+      "hueDiff",
+      "tintDiff",
+      "lightnessDiff",
+      "label",
+    ];
+
+    const lines = filteredRounds.map((entry) => [
+      new Date(Number(entry.createdAt || 0)).toISOString(),
+      entry.source || "",
+      entry.mode || "",
+      entry.roomCode || "",
+      entry.roundNumber ?? "",
+      entry.maxRounds ?? "",
+      entry.score ?? "",
+      entry.hueDiff ?? "",
+      entry.tintDiff ?? "",
+      entry.lightnessDiff ?? "",
+      entry.label || "",
+    ].map(toCsvValue).join(","));
+
+    const csv = [header.join(","), ...lines].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `color-game-history-${Date.now()}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  sourceSelect.addEventListener("change", () => {
+    historySourceFilter = sourceSelect.value;
+    renderScorePages();
+  });
+
+  modeSelect.addEventListener("change", () => {
+    historyModeFilter = modeSelect.value;
+    renderScorePages();
+  });
+
+  periodSelect.addEventListener("change", () => {
+    historyPeriodFilter = periodSelect.value;
+    renderScorePages();
+  });
+
+  exportBtn.addEventListener("click", exportHistoryCsv);
 }
 
 function setScorePage(nextPage) {
@@ -1788,10 +2019,12 @@ function setScorePage(nextPage) {
   scoreTabPersoBtn.classList.toggle("active", scorePage === "perso");
   scoreTabFriendsBtn.classList.toggle("active", scorePage === "friends");
   scoreTabGlobalBtn.classList.toggle("active", scorePage === "global");
+  scoreTabHistoryBtn.classList.toggle("active", scorePage === "history");
 
   scorePagePerso.classList.toggle("hidden", scorePage !== "perso");
   scorePageFriends.classList.toggle("hidden", scorePage !== "friends");
   scorePageGlobal.classList.toggle("hidden", scorePage !== "global");
+  scorePageHistory.classList.toggle("hidden", scorePage !== "history");
 }
 
 function closeScoreDrawer() {
@@ -1985,6 +2218,21 @@ function scoreGuess() {
     label: targetColor.name || targetColor.code || null,
   });
 
+  trackSoloRound({
+    mode: localMode,
+    roundNumber: soloRoundNumber,
+    maxRounds: MATCH_ROUNDS,
+    score,
+    hueDiff,
+    tintDiff,
+    lightnessDiff,
+    target: { ...targetColor },
+    guess,
+    label: targetColor.name || targetColor.code || null,
+  }).then(() => {
+    refreshPersistedTracking();
+  });
+
   targetSwatch.style.background = hsl(targetColor.hue, targetColor.tint, targetColor.lightness);
   guessSwatch.style.background = hsl(guess.hue, guess.tint, guess.lightness);
 
@@ -2107,6 +2355,46 @@ function setOnlineStatus(message) {
   onlineStatus.textContent = message;
 }
 
+async function refreshPersistedTracking() {
+  if (!authenticatedUser) {
+    persistedTracking = null;
+    renderScorePages();
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/users/me/tracking");
+    const data = await response.json();
+    if (!response.ok || !data.ok) {
+      persistedTracking = null;
+      renderScorePages();
+      return;
+    }
+
+    persistedTracking = data;
+    renderScorePages();
+  } catch {
+    persistedTracking = null;
+    renderScorePages();
+  }
+}
+
+async function trackSoloRound(payload) {
+  if (!authenticatedUser) {
+    return;
+  }
+
+  try {
+    await fetch("/api/tracking/solo-round", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    // Ignore: le jeu doit rester fluide meme si le suivi echoue.
+  }
+}
+
 function setAuthenticatedUser(user) {
   authenticatedUser = user;
   const isLoggedIn = !!authenticatedUser;
@@ -2122,7 +2410,10 @@ function setAuthenticatedUser(user) {
     authPasswordInput.value = "";
   } else {
     authStatus.textContent = "Non connecte.";
+    persistedTracking = null;
   }
+
+  renderScorePages();
 }
 
 function toggleBrandTitle() {
@@ -2155,6 +2446,9 @@ async function refreshAuthSession() {
       return;
     }
     setAuthenticatedUser(data.user);
+    if (data.user) {
+      await refreshPersistedTracking();
+    }
   } catch {
     setAuthenticatedUser(null);
   }
@@ -2404,9 +2698,20 @@ joinRoomBtn.addEventListener("click", () => {
   }
 
   const roomCode = roomCodeInput.value.trim().toUpperCase();
+  if (!roomCode) {
+    setOnlineStatus("Entre un code salon pour rejoindre.");
+    roomCodeInput.focus();
+    return;
+  }
   socket.emit("join_room", { roomCode, name: getPlayerName() });
   setOnlineStatus("Tentative de connexion au salon...");
 });
+
+if (changeRoomBtn) {
+  changeRoomBtn.addEventListener("click", () => {
+    changeOnlineRoom();
+  });
+}
 
 if (copyRoomCodeBtn) {
   copyRoomCodeBtn.addEventListener("click", async () => {
@@ -2559,6 +2864,7 @@ scoreCloseBtn.addEventListener("click", closeScoreDrawer);
 scoreTabPersoBtn.addEventListener("click", () => setScorePage("perso"));
 scoreTabFriendsBtn.addEventListener("click", () => setScorePage("friends"));
 scoreTabGlobalBtn.addEventListener("click", () => setScorePage("global"));
+scoreTabHistoryBtn.addEventListener("click", () => setScorePage("history"));
 
 registerBtn.addEventListener("click", async () => {
   pulseButton(registerBtn);
@@ -2568,6 +2874,7 @@ registerBtn.addEventListener("click", async () => {
       password: authPasswordInput.value,
     });
     setAuthenticatedUser(data.user);
+    await refreshPersistedTracking();
   } catch (error) {
     authStatus.textContent = error.message;
   }
@@ -2581,6 +2888,7 @@ loginBtn.addEventListener("click", async () => {
       password: authPasswordInput.value,
     });
     setAuthenticatedUser(data.user);
+    await refreshPersistedTracking();
   } catch (error) {
     authStatus.textContent = error.message;
   }
@@ -2594,6 +2902,7 @@ logoutBtn.addEventListener("click", async () => {
     // Ignore et force un état déconnecté local.
   }
   setAuthenticatedUser(null);
+  renderScorePages();
 });
 
 document.addEventListener("keydown", (event) => {

@@ -25,7 +25,6 @@ const {
   parseCookies,
   setAuthCookie,
   clearAuthCookie,
-  getSessionFromRequest,
 } = require("./src/server/auth-utils");
 const {
   randomInt,
@@ -64,10 +63,271 @@ db.prepare(
   )`,
 ).run();
 
+db.prepare(
+  `CREATE TABLE IF NOT EXISTS user_sessions (
+    token TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    username TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    last_seen_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`,
+).run();
+
+db.prepare(
+  `CREATE TABLE IF NOT EXISTS user_round_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    source TEXT NOT NULL,
+    mode TEXT NOT NULL,
+    room_code TEXT,
+    round_number INTEGER,
+    max_rounds INTEGER,
+    score REAL NOT NULL,
+    hue_diff REAL,
+    tint_diff REAL,
+    lightness_diff REAL,
+    target_hue REAL,
+    target_tint REAL,
+    target_lightness REAL,
+    guess_hue REAL,
+    guess_tint REAL,
+    guess_lightness REAL,
+    label TEXT,
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`,
+).run();
+
+db.prepare(
+  `CREATE TABLE IF NOT EXISTS user_match_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    source TEXT NOT NULL,
+    mode TEXT NOT NULL,
+    room_code TEXT,
+    rounds_played INTEGER NOT NULL,
+    total_score REAL NOT NULL,
+    best_round REAL NOT NULL,
+    average_score REAL NOT NULL,
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`,
+).run();
+
+db.prepare(
+  `CREATE TABLE IF NOT EXISTS user_activity_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    event_type TEXT NOT NULL,
+    metadata_json TEXT,
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`,
+).run();
+
+db.prepare("CREATE INDEX IF NOT EXISTS idx_round_history_user_created ON user_round_history (user_id, created_at DESC)").run();
+db.prepare("CREATE INDEX IF NOT EXISTS idx_match_history_user_created ON user_match_history (user_id, created_at DESC)").run();
+db.prepare("CREATE INDEX IF NOT EXISTS idx_activity_log_user_created ON user_activity_log (user_id, created_at DESC)").run();
+db.prepare("CREATE INDEX IF NOT EXISTS idx_sessions_expires ON user_sessions (expires_at)").run();
+
 const authSessions = new Map();
 
 const rooms = new Map();
 const roomTimers = new Map();
+
+const insertSessionStmt = db.prepare(
+  `INSERT OR REPLACE INTO user_sessions
+    (token, user_id, username, created_at, last_seen_at, expires_at)
+   VALUES (?, ?, ?, ?, ?, ?)`,
+);
+const getSessionStmt = db.prepare(
+  `SELECT token, user_id, username, created_at, last_seen_at, expires_at
+   FROM user_sessions
+   WHERE token = ?`,
+);
+const updateSessionActivityStmt = db.prepare(
+  "UPDATE user_sessions SET last_seen_at = ?, expires_at = ? WHERE token = ?",
+);
+const deleteSessionStmt = db.prepare("DELETE FROM user_sessions WHERE token = ?");
+const cleanupExpiredSessionsStmt = db.prepare("DELETE FROM user_sessions WHERE expires_at < ?");
+
+const insertActivityStmt = db.prepare(
+  `INSERT INTO user_activity_log (user_id, event_type, metadata_json, created_at)
+   VALUES (?, ?, ?, ?)`,
+);
+const insertRoundHistoryStmt = db.prepare(
+  `INSERT INTO user_round_history (
+    user_id, source, mode, room_code, round_number, max_rounds,
+    score, hue_diff, tint_diff, lightness_diff,
+    target_hue, target_tint, target_lightness,
+    guess_hue, guess_tint, guess_lightness,
+    label, created_at
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+);
+const insertMatchHistoryStmt = db.prepare(
+  `INSERT INTO user_match_history (
+    user_id, source, mode, room_code, rounds_played,
+    total_score, best_round, average_score, created_at
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+);
+
+function createAuthSession(userId, username) {
+  const token = crypto.randomUUID();
+  const now = Date.now();
+  insertSessionStmt.run(token, userId, username, now, now, now + AUTH_TTL_MS);
+  authSessions.set(token, {
+    userId,
+    username,
+    createdAt: now,
+  });
+  return token;
+}
+
+function touchSession(token) {
+  const now = Date.now();
+  updateSessionActivityStmt.run(now, now + AUTH_TTL_MS, token);
+}
+
+function deleteSession(token) {
+  if (!token) {
+    return;
+  }
+  authSessions.delete(token);
+  deleteSessionStmt.run(token);
+}
+
+function getSessionFromRequest(req) {
+  const cookies = parseCookies(req);
+  const token = cookies[AUTH_COOKIE_NAME];
+  if (!token) {
+    return null;
+  }
+
+  const now = Date.now();
+  const dbSession = getSessionStmt.get(token);
+  if (!dbSession) {
+    authSessions.delete(token);
+    return null;
+  }
+
+  if (dbSession.expires_at < now) {
+    deleteSession(token);
+    return null;
+  }
+
+  touchSession(token);
+  authSessions.set(token, {
+    userId: dbSession.user_id,
+    username: dbSession.username,
+    createdAt: dbSession.created_at,
+  });
+
+  return {
+    token,
+    userId: dbSession.user_id,
+    username: dbSession.username,
+    createdAt: dbSession.created_at,
+  };
+}
+
+function logUserActivity(userId, eventType, metadata = null) {
+  if (!userId || !eventType) {
+    return;
+  }
+
+  let serializedMetadata = null;
+  if (metadata && typeof metadata === "object") {
+    try {
+      serializedMetadata = JSON.stringify(metadata);
+    } catch {
+      serializedMetadata = null;
+    }
+  }
+
+  insertActivityStmt.run(userId, eventType, serializedMetadata, Date.now());
+}
+
+function recordRoundHistory(userId, payload) {
+  if (!userId || !payload) {
+    return;
+  }
+
+  insertRoundHistoryStmt.run(
+    userId,
+    String(payload.source || "unknown"),
+    String(payload.mode || "memory"),
+    payload.roomCode || null,
+    payload.roundNumber ?? null,
+    payload.maxRounds ?? null,
+    Number(payload.score || 0),
+    payload.hueDiff ?? null,
+    payload.tintDiff ?? null,
+    payload.lightnessDiff ?? null,
+    payload.target?.hue ?? null,
+    payload.target?.tint ?? null,
+    payload.target?.lightness ?? null,
+    payload.guess?.hue ?? null,
+    payload.guess?.tint ?? null,
+    payload.guess?.lightness ?? null,
+    payload.label || null,
+    Date.now(),
+  );
+}
+
+function recordMatchHistoryFromRounds(userId, source, mode, roomCode, rounds) {
+  if (!userId || !Array.isArray(rounds) || rounds.length === 0) {
+    return;
+  }
+
+  const normalizedScores = rounds.map((round) => Number(round.score || 0));
+  const totalScore = normalizedScores.reduce((sum, value) => sum + value, 0);
+  const bestRound = Math.max(...normalizedScores);
+  const averageScore = totalScore / rounds.length;
+
+  insertMatchHistoryStmt.run(
+    userId,
+    source,
+    mode,
+    roomCode || null,
+    rounds.length,
+    totalScore,
+    bestRound,
+    averageScore,
+    Date.now(),
+  );
+}
+
+function recordOnlineMatchHistoryForRoom(roomCode, room) {
+  if (!roomCode || !room) {
+    return;
+  }
+
+  for (const player of room.players.values()) {
+    if (!player.userId) {
+      continue;
+    }
+
+    const rounds = db.prepare(
+      `SELECT score FROM user_round_history
+       WHERE user_id = ? AND source = 'online' AND room_code = ?
+       ORDER BY id DESC
+       LIMIT ?`,
+    ).all(player.userId, roomCode, room.maxRounds).reverse();
+
+    if (rounds.length === 0) {
+      continue;
+    }
+
+    recordMatchHistoryFromRounds(player.userId, "online", room.mode, roomCode, rounds);
+    logUserActivity(player.userId, "online_match_finished", {
+      roomCode,
+      mode: room.mode,
+      rounds: rounds.length,
+    });
+  }
+}
 
 function normalizeOnlineMode(mode) {
   return VALID_ONLINE_MODES.has(mode) ? mode : "memory";
@@ -77,9 +337,10 @@ function normalizeCodeFormat(codeFormat) {
   return VALID_CODE_FORMATS.has(codeFormat) ? codeFormat : "auto";
 }
 
-function createPlayerState(socketId, name) {
+function createPlayerState(socketId, name, userId = null) {
   return {
     id: socketId,
+    userId,
     name: (name || "Joueur").slice(0, 20),
     submitted: false,
     lastScore: 0,
@@ -89,7 +350,7 @@ function createPlayerState(socketId, name) {
   };
 }
 
-function createRoomState(socketId, name, mode, codeFormat) {
+function createRoomState(socketId, name, mode, codeFormat, userId = null) {
   const normalizedMode = normalizeOnlineMode(mode);
   const normalizedCodeFormat = normalizeCodeFormat(codeFormat);
 
@@ -106,7 +367,7 @@ function createRoomState(socketId, name, mode, codeFormat) {
     codeFormat: normalizedMode === "code" ? normalizedCodeFormat : "auto",
     namedColorPool: normalizedMode === "name" ? buildNamedColorPool() : [],
     chatMessages: [],
-    players: new Map([[socketId, createPlayerState(socketId, name)]]),
+    players: new Map([[socketId, createPlayerState(socketId, name, userId)]]),
   };
 }
 
@@ -404,6 +665,7 @@ function tryCloseRound(roomCode) {
   }
 
   if (matchFinished) {
+    recordOnlineMatchHistoryForRoom(roomCode, room);
     io.to(roomCode).emit("match_finished", {
       leaderboard,
       maxRounds: room.maxRounds,
@@ -424,6 +686,22 @@ function tryCloseRound(roomCode) {
 }
 
 app.use(express.json());
+
+app.use((req, res, next) => {
+  cleanupExpiredSessionsStmt.run(Date.now());
+  next();
+});
+
+function requireAuth(req, res, next) {
+  const session = getSessionFromRequest(req);
+  if (!session) {
+    res.status(401).json({ ok: false, message: "Authentification requise." });
+    return;
+  }
+
+  req.authSession = session;
+  next();
+}
 
 app.post("/api/auth/register", (req, res) => {
   const username = String(req.body?.username || "").trim();
@@ -452,15 +730,15 @@ app.post("/api/auth/register", (req, res) => {
     .prepare("INSERT INTO users (username, username_norm, password_hash, created_at) VALUES (?, ?, ?, ?)")
     .run(username, usernameNorm, passwordHash, createdAt);
 
-  const token = crypto.randomUUID();
-  authSessions.set(token, {
-    userId: result.lastInsertRowid,
+  const userId = Number(result.lastInsertRowid);
+  const token = createAuthSession(userId, username);
+
+  logUserActivity(userId, "register", {
     username,
-    createdAt: Date.now(),
   });
 
   setAuthCookie(res, token);
-  res.json({ ok: true, user: { id: result.lastInsertRowid, username } });
+  res.json({ ok: true, user: { id: userId, username } });
 });
 
 app.post("/api/auth/login", (req, res) => {
@@ -473,11 +751,10 @@ app.post("/api/auth/login", (req, res) => {
     return;
   }
 
-  const token = crypto.randomUUID();
-  authSessions.set(token, {
-    userId: user.id,
+  const token = createAuthSession(user.id, user.username);
+
+  logUserActivity(user.id, "login", {
     username: user.username,
-    createdAt: Date.now(),
   });
 
   setAuthCookie(res, token);
@@ -485,7 +762,7 @@ app.post("/api/auth/login", (req, res) => {
 });
 
 app.get("/api/auth/me", (req, res) => {
-  const session = getSessionFromRequest(req, authSessions);
+  const session = getSessionFromRequest(req);
   if (!session) {
     res.json({ ok: true, user: null });
     return;
@@ -495,11 +772,154 @@ app.get("/api/auth/me", (req, res) => {
 });
 
 app.post("/api/auth/logout", (req, res) => {
-  const session = getSessionFromRequest(req, authSessions);
+  const session = getSessionFromRequest(req);
   if (session) {
-    authSessions.delete(session.token);
+    logUserActivity(session.userId, "logout", null);
+    deleteSession(session.token);
   }
   clearAuthCookie(res);
+  res.json({ ok: true });
+});
+
+app.get("/api/users/me/tracking", requireAuth, (req, res) => {
+  const { userId } = req.authSession;
+
+  const stats = db.prepare(
+    `SELECT
+      COUNT(*) AS rounds,
+      COALESCE(SUM(score), 0) AS totalScore,
+      COALESCE(MAX(score), 0) AS bestRound,
+      COALESCE(AVG(score), 0) AS averageScore,
+      COALESCE(SUM(CASE WHEN source = 'solo' THEN 1 ELSE 0 END), 0) AS soloRounds,
+      COALESCE(SUM(CASE WHEN source = 'online' THEN 1 ELSE 0 END), 0) AS onlineRounds
+     FROM user_round_history
+     WHERE user_id = ?`,
+  ).get(userId);
+
+  const matches = db.prepare(
+    `SELECT source, mode, room_code AS roomCode, rounds_played AS roundsPlayed,
+            total_score AS totalScore, best_round AS bestRound,
+            average_score AS averageScore, created_at AS createdAt
+     FROM user_match_history
+     WHERE user_id = ?
+     ORDER BY created_at DESC
+     LIMIT 15`,
+  ).all(userId);
+
+  const rounds = db.prepare(
+    `SELECT source, mode, room_code AS roomCode, round_number AS roundNumber,
+            max_rounds AS maxRounds, score, hue_diff AS hueDiff,
+            tint_diff AS tintDiff, lightness_diff AS lightnessDiff,
+            label, created_at AS createdAt
+     FROM user_round_history
+     WHERE user_id = ?
+     ORDER BY created_at DESC
+     LIMIT 30`,
+  ).all(userId);
+
+  const activity = db.prepare(
+    `SELECT event_type AS eventType, metadata_json AS metadataJson, created_at AS createdAt
+     FROM user_activity_log
+     WHERE user_id = ?
+     ORDER BY created_at DESC
+     LIMIT 40`,
+  ).all(userId)
+    .map((entry) => {
+      let metadata = null;
+      if (entry.metadataJson) {
+        try {
+          metadata = JSON.parse(entry.metadataJson);
+        } catch {
+          metadata = null;
+        }
+      }
+      return {
+        eventType: entry.eventType,
+        metadata,
+        createdAt: entry.createdAt,
+      };
+    });
+
+  const global = db.prepare(
+    `SELECT u.username,
+            ROUND(AVG(h.score), 2) AS averageScore,
+            COUNT(*) AS rounds
+     FROM user_round_history h
+     JOIN users u ON u.id = h.user_id
+     GROUP BY h.user_id
+     HAVING COUNT(*) >= 3
+     ORDER BY averageScore DESC, rounds DESC
+     LIMIT 20`,
+  ).all();
+
+  res.json({
+    ok: true,
+    stats: {
+      rounds: Number(stats.rounds || 0),
+      totalScore: Number(stats.totalScore || 0),
+      bestRound: Number(stats.bestRound || 0),
+      averageScore: Number(stats.averageScore || 0),
+      soloRounds: Number(stats.soloRounds || 0),
+      onlineRounds: Number(stats.onlineRounds || 0),
+      matches: matches.length,
+    },
+    matches,
+    rounds,
+    activity,
+    global,
+  });
+});
+
+app.post("/api/tracking/solo-round", requireAuth, (req, res) => {
+  const mode = String(req.body?.mode || "memory");
+  const roundNumber = Number(req.body?.roundNumber || 0);
+  const maxRounds = Number(req.body?.maxRounds || MATCH_ROUNDS);
+  const score = Number(req.body?.score || 0);
+
+  if (!Number.isFinite(score) || score < 0 || score > 100) {
+    res.status(400).json({ ok: false, message: "Score invalide." });
+    return;
+  }
+
+  recordRoundHistory(req.authSession.userId, {
+    source: "solo",
+    mode,
+    roomCode: null,
+    roundNumber,
+    maxRounds,
+    score,
+    hueDiff: Number(req.body?.hueDiff || 0),
+    tintDiff: Number(req.body?.tintDiff || 0),
+    lightnessDiff: Number(req.body?.lightnessDiff || 0),
+    target: req.body?.target || null,
+    guess: req.body?.guess || null,
+    label: req.body?.label || null,
+  });
+
+  logUserActivity(req.authSession.userId, "solo_round_submitted", {
+    roundNumber,
+    maxRounds,
+    score,
+    mode,
+  });
+
+  if (roundNumber >= maxRounds) {
+    const rounds = db.prepare(
+      `SELECT score FROM user_round_history
+       WHERE user_id = ? AND source = 'solo'
+       ORDER BY id DESC
+       LIMIT ?`,
+    ).all(req.authSession.userId, maxRounds).reverse();
+
+    if (rounds.length > 0) {
+      recordMatchHistoryFromRounds(req.authSession.userId, "solo", mode, null, rounds);
+      logUserActivity(req.authSession.userId, "solo_match_finished", {
+        rounds: rounds.length,
+        mode,
+      });
+    }
+  }
+
   res.json({ ok: true });
 });
 
@@ -514,32 +934,76 @@ app.get("/api/named-colors", (req, res) => {
 app.use(express.static(path.join(__dirname)));
 
 io.on("connection", (socket) => {
+  const socketCookies = parseCookies({ headers: socket.handshake.headers || {} });
+  const socketToken = socketCookies[AUTH_COOKIE_NAME];
+  const socketSession = socketToken ? getSessionStmt.get(socketToken) : null;
+  if (socketSession && socketSession.expires_at >= Date.now()) {
+    socket.data.authUser = {
+      userId: socketSession.user_id,
+      username: socketSession.username,
+    };
+    touchSession(socketToken);
+  } else {
+    socket.data.authUser = null;
+  }
+
   socket.on("create_room", ({ name, mode, codeFormat }) => {
+    const previousRoomCode = socket.data.roomCode;
+    if (previousRoomCode) {
+      removeSocketFromRoom(socket, previousRoomCode);
+    }
+
     let roomCode = makeRoomCode();
     while (rooms.has(roomCode)) {
       roomCode = makeRoomCode();
     }
 
-    const room = createRoomState(socket.id, name, mode, codeFormat);
+    const room = createRoomState(socket.id, name, mode, codeFormat, socket.data.authUser?.userId || null);
 
     rooms.set(roomCode, room);
     socket.join(roomCode);
     socket.data.roomCode = roomCode;
+    if (socket.data.authUser?.userId) {
+      logUserActivity(socket.data.authUser.userId, "create_room", {
+        roomCode,
+        mode: room.mode,
+      });
+    }
     emitRoomState(roomCode);
   });
 
   socket.on("join_room", ({ roomCode, name }) => {
     const normalizedCode = String(roomCode || "").trim().toUpperCase();
+    if (!normalizedCode) {
+      socket.emit("error_message", "Code salon invalide.");
+      return;
+    }
+
+    if (socket.data.roomCode === normalizedCode) {
+      emitRoomState(normalizedCode);
+      return;
+    }
+
     const room = rooms.get(normalizedCode);
     if (!room) {
       socket.emit("error_message", "Salon introuvable.");
       return;
     }
 
-    room.players.set(socket.id, createPlayerState(socket.id, name));
+    const previousRoomCode = socket.data.roomCode;
+    if (previousRoomCode) {
+      removeSocketFromRoom(socket, previousRoomCode);
+    }
+
+    room.players.set(socket.id, createPlayerState(socket.id, name, socket.data.authUser?.userId || null));
 
     socket.join(normalizedCode);
     socket.data.roomCode = normalizedCode;
+    if (socket.data.authUser?.userId) {
+      logUserActivity(socket.data.authUser.userId, "join_room", {
+        roomCode: normalizedCode,
+      });
+    }
     emitRoomState(normalizedCode);
   });
 
@@ -549,6 +1013,11 @@ io.on("connection", (socket) => {
       return;
     }
 
+    if (socket.data.authUser?.userId) {
+      logUserActivity(socket.data.authUser.userId, "leave_room", {
+        roomCode,
+      });
+    }
     removeSocketFromRoom(socket, roomCode);
   });
 
@@ -643,6 +1112,23 @@ io.on("connection", (socket) => {
     player.currentResult = scoreData;
     player.lastScore = scoreData.score;
     player.totalScore += scoreData.score;
+
+    if (player.userId) {
+      recordRoundHistory(player.userId, {
+        source: "online",
+        mode: room.mode,
+        roomCode,
+        roundNumber: room.roundNumber,
+        maxRounds: room.maxRounds,
+        score: scoreData.score,
+        hueDiff: scoreData.hueDiff,
+        tintDiff: scoreData.tintDiff,
+        lightnessDiff: scoreData.lightnessDiff,
+        target: room.target,
+        guess,
+        label: room.target?.name || room.target?.code || null,
+      });
+    }
 
     emitRoomState(roomCode);
     tryCloseRound(roomCode);

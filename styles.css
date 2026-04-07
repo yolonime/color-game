@@ -230,7 +230,7 @@ body[data-theme="code"] {
 
 .score-tab-switch {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.35rem;
   width: 100%;
   margin: 0.3rem 0 0.85rem;
@@ -302,6 +302,40 @@ body[data-theme="code"] {
 .score-empty {
   margin: 0;
   color: var(--ink-soft);
+}
+
+.score-history-controls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin-bottom: 0.65rem;
+}
+
+.score-history-controls select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.86);
+  padding: 0.45rem 0.55rem;
+  font: inherit;
+}
+
+.score-history-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.score-history-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.35rem;
+  max-height: 260px;
+  overflow-y: auto;
 }
 
 body[data-theme="name"] .menu-drawer {
@@ -767,6 +801,44 @@ body[data-theme="online"] .menu-drawer {
   border-bottom: 1px solid rgba(31, 27, 22, 0.08);
 }
 
+.salon-flow {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.salon-step {
+  border: 1px solid rgba(31, 27, 22, 0.1);
+  background: rgba(255, 255, 255, 0.58);
+  border-radius: 12px;
+  padding: 0.7rem;
+}
+
+.salon-step-label {
+  margin: 0 0 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.salon-step .online-mode-section {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.salon-actions {
+  margin-top: 0.25rem;
+}
+
+.salon-room-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.55rem;
+}
+
 .online-code-format-section {
   margin-bottom: 1rem;
 }
@@ -803,10 +875,6 @@ body[data-theme="online"] .menu-drawer {
   color: var(--ink-soft);
   font-weight: 600;
   background: rgba(255, 255, 255, 0.54);
-}
-
-#copyRoomCodeBtn {
-  margin-top: 0.55rem;
 }
 
 .players-list,

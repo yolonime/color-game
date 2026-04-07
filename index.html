@@ -166,17 +166,19 @@
         </div>
         <button id="scoreCloseBtn" class="menu-close-btn" type="button" aria-label="Fermer les scores">×</button>
       </div>
-      <p class="menu-hint">Navigue entre tes stats, tes amis et un classement global.</p>
+      <p class="menu-hint">Navigue entre tes stats, tes amis, le global et ton historique.</p>
 
       <div class="score-tab-switch" aria-label="Pages de score">
         <button id="scoreTabPersoBtn" class="score-tab-btn active" type="button">Perso</button>
         <button id="scoreTabFriendsBtn" class="score-tab-btn" type="button">Ami</button>
         <button id="scoreTabGlobalBtn" class="score-tab-btn" type="button">Global</button>
+        <button id="scoreTabHistoryBtn" class="score-tab-btn" type="button">Historique</button>
       </div>
 
       <section id="scorePagePerso" class="score-page"></section>
       <section id="scorePageFriends" class="score-page hidden"></section>
       <section id="scorePageGlobal" class="score-page hidden"></section>
+      <section id="scorePageHistory" class="score-page hidden"></section>
     </aside>
 
     <section id="onlinePanel" class="online-panel hidden" aria-live="polite">
@@ -187,40 +189,55 @@
             <button id="salonSectionToggleBtn" class="section-toggle" type="button" aria-expanded="true" aria-controls="salonSectionBody">Reduire</button>
           </div>
           <div id="salonSectionBody" class="collapsible-body">
-          <div class="online-mode-section">
-            <p class="menu-section-title">Mode en ligne</p>
-            <div class="mode-switch" aria-label="Choix du mode en ligne">
-              <button id="onlineMemoryModeBtn" class="mode-btn active" type="button">Mémoire</button>
-              <button id="onlineNameModeBtn" class="mode-btn" type="button">Nom couleur</button>
-              <button id="onlineCodeModeBtn" class="mode-btn" type="button">Mode code</button>
+            <div class="salon-flow" aria-label="Etapes de connexion au salon">
+              <div class="salon-step">
+                <p class="salon-step-label">Etape 1</p>
+                <label for="playerNameInput">Choisis ton pseudo</label>
+                <input id="playerNameInput" type="text" maxlength="20" placeholder="Ex: Joueur1" />
+              </div>
+
+              <div class="salon-step">
+                <p class="salon-step-label">Etape 2</p>
+                <div class="online-mode-section">
+                  <p class="menu-section-title">Mode en ligne</p>
+                  <div class="mode-switch" aria-label="Choix du mode en ligne">
+                    <button id="onlineMemoryModeBtn" class="mode-btn active" type="button">Mémoire</button>
+                    <button id="onlineNameModeBtn" class="mode-btn" type="button">Nom couleur</button>
+                    <button id="onlineCodeModeBtn" class="mode-btn" type="button">Mode code</button>
+                  </div>
+                  <p class="online-mode-note">Le host choisit le mode avant de lancer la partie.</p>
+                </div>
+
+                <div id="onlineCodeFormatSection" class="menu-section hidden online-code-format-section">
+                  <p class="menu-section-title">Format du code</p>
+                  <div class="code-format-switch" aria-label="Choix format code couleur en ligne">
+                    <button id="onlineCodeFormatAutoBtn" class="code-format-btn active" type="button">Auto</button>
+                    <button id="onlineCodeFormatHexBtn" class="code-format-btn" type="button">HEX</button>
+                    <button id="onlineCodeFormatRgbBtn" class="code-format-btn" type="button">RGB</button>
+                    <button id="onlineCodeFormatHslBtn" class="code-format-btn" type="button">HSL</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="salon-step">
+                <p class="salon-step-label">Etape 3</p>
+                <label for="roomCodeInput">Code du salon</label>
+                <input id="roomCodeInput" type="text" maxlength="6" placeholder="AB12CD" />
+
+                <div class="actions salon-actions">
+                  <button id="createRoomBtn" class="btn btn-primary" type="button">Créer un salon</button>
+                  <button id="joinRoomBtn" class="btn btn-ghost" type="button">Rejoindre ce salon</button>
+                </div>
+
+                <div class="salon-room-tools">
+                  <button id="copyRoomCodeBtn" class="btn btn-ghost hidden" type="button">Copier le code du salon</button>
+                  <button id="changeRoomBtn" class="btn btn-ghost hidden" type="button">Changer de salon</button>
+                </div>
+              </div>
             </div>
-            <p class="online-mode-note">Le host choisit le mode avant de lancer la partie.</p>
-          </div>
 
-          <div id="onlineCodeFormatSection" class="menu-section hidden online-code-format-section">
-            <p class="menu-section-title">Format du code</p>
-            <div class="code-format-switch" aria-label="Choix format code couleur en ligne">
-              <button id="onlineCodeFormatAutoBtn" class="code-format-btn active" type="button">Auto</button>
-              <button id="onlineCodeFormatHexBtn" class="code-format-btn" type="button">HEX</button>
-              <button id="onlineCodeFormatRgbBtn" class="code-format-btn" type="button">RGB</button>
-              <button id="onlineCodeFormatHslBtn" class="code-format-btn" type="button">HSL</button>
-            </div>
-          </div>
-
-          <label for="playerNameInput">Pseudo</label>
-          <input id="playerNameInput" type="text" maxlength="20" placeholder="Ex: Joueur1" />
-
-          <label for="roomCodeInput">Code du salon</label>
-          <input id="roomCodeInput" type="text" maxlength="6" placeholder="AB12CD" />
-
-          <div class="actions">
-            <button id="createRoomBtn" class="btn btn-primary" type="button">Creer</button>
-            <button id="joinRoomBtn" class="btn btn-ghost" type="button">Rejoindre</button>
-          </div>
-
-          <p id="onlineStatus" class="online-status">Connecte-toi a un salon pour jouer en ligne.</p>
-          <p id="roomInfo" class="room-info"></p>
-          <button id="copyRoomCodeBtn" class="btn btn-ghost hidden" type="button">Copier le code du salon</button>
+            <p id="onlineStatus" class="online-status">Connecte-toi a un salon pour jouer en ligne.</p>
+            <p id="roomInfo" class="room-info is-empty">Aucun salon actif.</p>
           </div>
         </div>
 
