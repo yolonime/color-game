@@ -4,7 +4,6 @@
  */
 
 import { hsl as hslString } from '../color/conversion.js';
-import { createRandomTarget } from '../color/distance.js';
 
 // =============================================================================
 // Target Color Management
