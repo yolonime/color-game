@@ -35,6 +35,11 @@ import * as GameSolo from './game/solo.js';
 import * as GameOnline from './game/online.js';
 import * as Converter from './converter/index.js';
 
+// ====== NETWORK & EVENTS (Phase 6) ======
+import * as Auth from './auth.js';
+import * as SocketManager from './socket-manager.js';
+import * as Events from './events.js';
+
 // ====== Expose au contexte global pour rétro-compatibilité ======
 // Cela permet d'utiliser les modules préparés pendant que script.js reste le moteur principal.
 window.ColorGuesser = window.ColorGuesser || {};
@@ -63,6 +68,9 @@ window.ColorGuesser.Game = {
   online: GameOnline,
 };
 window.ColorGuesser.Converter = Converter;
+window.ColorGuesser.Auth = Auth;
+window.ColorGuesser.Socket = SocketManager;
+window.ColorGuesser.Events = Events;
 
 function loadLegacyScript() {
 	return new Promise((resolve, reject) => {

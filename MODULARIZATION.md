@@ -95,11 +95,11 @@ src/
 - [x] `converter/index.js` - updateConverterDisplay, updateConverterGradientBars, copyToClipboard, formatRgbString, formatHslString, getConverterHintText, getInitialConverterState
 - **Statut**: Modules logique créés, exposés via window.ColorGuesser.Game et window.ColorGuesser.Converter
 
-### Phase 6 : Réseau & Événements ⏳
-- `auth.js` - authRequest, refreshAuthSession, setAuthenticatedUser
-- `socket-manager.js` - Tous socket.on et socket.emit
-- `events.js` - addEventListener (buttons, sliders, inputs)
-- Côté serveur, les modules `src/server/constants.js`, `src/server/auth-utils.js` et `src/server/color-utils.js` sont déjà extraits.
+### Phase 6 : Réseau & Événements ✅
+- [x] `auth.js` - loginRequest, registerRequest, refreshAuthSession, logoutRequest, setAuthenticatedUser, getPlayerName, isAuthenticated, getUserProfile, isValidAuthResponse, formatAuthError
+- [x] `socket-manager.js` - initializeSocket, getSocket, isSocketConnected, disconnectSocket, reconnectSocket, onSocketEvent, offSocketEvent, emitJoinRoom, emitLeaveRoom, emitPlayerReady, emitStartRound, emitSubmitRound, emitChatMessage, createRoom, getAvailableRooms, getRoomDetails
+- [x] `events.js` - registerEvent, registerEvents, setupSliderEvents, setupButtonEvents, setupFormEvents, setupInputEvents, setupMenuToggleEvent, setupKeyboardShortcuts, setupEnterKeyHandler, setupWindowResizeHandler, triggerCustomEvent, onCustomEvent, throttleEventHandler, debounceEventHandler
+- **Statut**: Modules réseau et événements créés, exposés via window.ColorGuesser.Auth, window.ColorGuesser.Socket, window.ColorGuesser.Events - commit 9f8a2c1
 
 ### Phase 7 : Intégration ⏳
 - Mettre à jour `index.html` avec imports ES6
@@ -191,4 +191,4 @@ Implémentation: Vous et les modules
 
 ---
 
-**Status**: 🟡 En cours - Étape 1 complétée, Étape 2-6 à faire
+**Status**: 🟡 En cours - Phases 1-6 complétées (All Core Modules), Phase 7 (Integration & Testing) en préparation
