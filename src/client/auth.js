@@ -18,7 +18,7 @@ export async function loginRequest(name, password) {
     const response = await fetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, password }),
+      body: JSON.stringify({ username: name, password }),
     });
 
     const data = await response.json();
@@ -26,7 +26,7 @@ export async function loginRequest(name, password) {
     if (!response.ok) {
       return {
         success: false,
-        error: data.error || `HTTP ${response.status}`,
+        error: data.message || data.error || `HTTP ${response.status}`,
         user: null,
       };
     }
@@ -56,7 +56,7 @@ export async function registerRequest(name, password) {
     const response = await fetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, password }),
+      body: JSON.stringify({ username: name, password }),
     });
 
     const data = await response.json();
@@ -64,7 +64,7 @@ export async function registerRequest(name, password) {
     if (!response.ok) {
       return {
         success: false,
-        error: data.error || `HTTP ${response.status}`,
+        error: data.message || data.error || `HTTP ${response.status}`,
         user: null,
       };
     }
@@ -89,7 +89,7 @@ export async function registerRequest(name, password) {
  */
 export async function refreshAuthSession() {
   try {
-    const response = await fetch("/api/auth/session", {
+    const response = await fetch("/api/auth/me", {
       method: "GET",
       credentials: "include",
     });
@@ -99,7 +99,7 @@ export async function refreshAuthSession() {
     if (!response.ok) {
       return {
         success: false,
-        error: data.error,
+        error: data.message || data.error,
         user: null,
       };
     }
@@ -171,8 +171,8 @@ export function setAuthenticatedUser(user, stateUpdater) {
  * @returns {string} Display name
  */
 export function getPlayerName(authenticatedUser) {
-  if (authenticatedUser && authenticatedUser.name) {
-    return authenticatedUser.name;
+  if (authenticatedUser && (authenticatedUser.name || authenticatedUser.username)) {
+    return authenticatedUser.name || authenticatedUser.username;
   }
   return "Joueur anonyme";
 }
@@ -183,7 +183,7 @@ export function getPlayerName(authenticatedUser) {
  * @returns {boolean} True if logged in
  */
 export function isAuthenticated(authenticatedUser) {
-  return !!authenticatedUser && !!authenticatedUser.name;
+  return !!authenticatedUser && !!(authenticatedUser.name || authenticatedUser.username);
 }
 
 /**
@@ -202,7 +202,7 @@ export function getUserProfile(authenticatedUser) {
   }
 
   return {
-    name: authenticatedUser.name,
+    name: authenticatedUser.name || authenticatedUser.username,
     roundsPlayed: authenticatedUser.roundsPlayed || 0,
     bestScore: authenticatedUser.bestScore || 0,
     averageScore: authenticatedUser.averageScore || 0,
@@ -223,7 +223,7 @@ export function isValidAuthResponse(response) {
     return false;
   }
 
-  return !!(response.user && response.user.name);
+  return !!(response.user && (response.user.name || response.user.username));
 }
 
 /**
