@@ -57,6 +57,10 @@
         <span class="trophy-icon" aria-hidden="true">🏆</span>
         <span class="trophy-label">Scores</span>
       </button>
+      <button id="socialBtn" class="social-btn" type="button" aria-expanded="false" aria-controls="socialDrawer" aria-label="Ouvrir le social">
+        <span class="social-icon" aria-hidden="true">👥</span>
+        <span class="social-label">Social</span>
+      </button>
       <p id="modeEyebrow" class="eyebrow">Mode 1</p>
       <h1 id="brandTitle" class="brand-title" role="button" tabindex="0" aria-pressed="false">Color Guesser</h1>
       <p id="heroSubtitle" class="subtitle">Observe la couleur pendant 5 secondes, puis recree-la avec les curseurs.</p>
@@ -166,19 +170,31 @@
         </div>
         <button id="scoreCloseBtn" class="menu-close-btn" type="button" aria-label="Fermer les scores">×</button>
       </div>
-      <p class="menu-hint">Navigue entre tes stats, tes amis, le global et ton historique.</p>
+      <p class="menu-hint">Navigue entre tes stats, le global et ton historique.</p>
 
       <div class="score-tab-switch" aria-label="Pages de score">
         <button id="scoreTabPersoBtn" class="score-tab-btn active" type="button">Perso</button>
-        <button id="scoreTabFriendsBtn" class="score-tab-btn" type="button">Ami</button>
         <button id="scoreTabGlobalBtn" class="score-tab-btn" type="button">Global</button>
         <button id="scoreTabHistoryBtn" class="score-tab-btn" type="button">Historique</button>
       </div>
 
       <section id="scorePagePerso" class="score-page"></section>
-      <section id="scorePageFriends" class="score-page hidden"></section>
       <section id="scorePageGlobal" class="score-page hidden"></section>
       <section id="scorePageHistory" class="score-page hidden"></section>
+    </aside>
+
+    <div id="socialBackdrop" class="menu-backdrop hidden" aria-hidden="true"></div>
+
+    <aside id="socialDrawer" class="social-drawer hidden" aria-label="Espace social">
+      <div class="menu-head">
+        <div>
+          <p class="menu-eyebrow">Social Hub</p>
+          <h2>Amis et messages</h2>
+        </div>
+        <button id="socialCloseBtn" class="menu-close-btn" type="button" aria-label="Fermer le social">×</button>
+      </div>
+      <p class="menu-hint">Gere tes amis, envoie des invitations de salon et discute en message prive.</p>
+      <section id="socialPage" class="score-page"></section>
     </aside>
 
     <section id="onlinePanel" class="online-panel hidden" aria-live="polite">

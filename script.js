@@ -53,6 +53,7 @@ const onlinePanel = document.getElementById("onlinePanel");
 
 const burgerBtn = document.getElementById("burgerBtn");
 const trophyBtn = document.getElementById("trophyBtn");
+const socialBtn = document.getElementById("socialBtn");
 const quickStartBtn = document.getElementById("quickStartBtn");
 const nameDifficultyChip = document.getElementById("nameDifficultyChip");
 const codeFormatChip = document.getElementById("codeFormatChip");
@@ -69,13 +70,15 @@ const scoreBackdrop = document.getElementById("scoreBackdrop");
 const scoreDrawer = document.getElementById("scoreDrawer");
 const scoreCloseBtn = document.getElementById("scoreCloseBtn");
 const scoreTabPersoBtn = document.getElementById("scoreTabPersoBtn");
-const scoreTabFriendsBtn = document.getElementById("scoreTabFriendsBtn");
 const scoreTabGlobalBtn = document.getElementById("scoreTabGlobalBtn");
 const scoreTabHistoryBtn = document.getElementById("scoreTabHistoryBtn");
 const scorePagePerso = document.getElementById("scorePagePerso");
-const scorePageFriends = document.getElementById("scorePageFriends");
 const scorePageGlobal = document.getElementById("scorePageGlobal");
 const scorePageHistory = document.getElementById("scorePageHistory");
+const socialBackdrop = document.getElementById("socialBackdrop");
+const socialDrawer = document.getElementById("socialDrawer");
+const socialCloseBtn = document.getElementById("socialCloseBtn");
+const socialPage = document.getElementById("socialPage");
 
 const nameDifficultySection = document.getElementById("nameDifficultySection");
 const difficultyEasyBtn = document.getElementById("difficultyEasyBtn");
@@ -197,6 +200,10 @@ let persistedTracking = null;
 let friendsData = [];
 let incomingFriendRequests = [];
 let outgoingFriendRequests = [];
+let incomingSocialInvites = [];
+let outgoingSocialInvites = [];
+let socialSelectedFriendId = null;
+let socialMessages = [];
 let friendsPollingInterval = null;
 let hasHydratedFriendsPresence = false;
 let historySourceFilter = "all";
@@ -246,6 +253,7 @@ function startFriendsPolling() {
 
   friendsPollingInterval = setInterval(() => {
     refreshFriendsData();
+    refreshSocialInvites();
   }, 15000);
 }
 
@@ -1659,6 +1667,7 @@ function updateAppView() {
   onlinePanel.classList.toggle("hidden", !isGameView || gameMode !== "online");
   burgerBtn.classList.toggle("hidden", !isGameView);
   trophyBtn.classList.toggle("hidden", !isGameView);
+  socialBtn.classList.toggle("hidden", !isGameView);
 
   brandTitle.textContent = isGameView ? "Color Guesser" : "Color Helper";
   brandTitle.setAttribute("aria-pressed", String(!isGameView));
@@ -1672,6 +1681,7 @@ function updateAppView() {
   if (!isGameView) {
     closeMenu();
     closeScoreDrawer();
+    closeSocialDrawer();
   }
 }
 
@@ -1888,95 +1898,6 @@ function renderScorePages() {
     <p class="score-empty">Derniere partie: ${latestMatchText}</p>
   `;
 
-  if (!authenticatedUser) {
-    scorePageFriends.innerHTML = '<p class="score-empty">Connecte-toi pour ajouter des amis et voir leur statut en ligne.</p>';
-  } else {
-    const friendRows = friendsData.length > 0
-      ? friendsData
-        .map((friend) => {
-          const roomDetails = friend.currentRoomCode
-            ? ` (salon ${friend.currentRoomCode}${friend.isInMatch ? ", en partie" : ""})`
-            : "";
-          const status = friend.isOnline
-            ? `En ligne${roomDetails}`
-            : `Hors ligne (vu: ${getLastSeenLabel(friend.lastSeenAt)})`;
-          return `<li><strong>${friend.username}</strong> - ${status} - Moy: ${formatScore(friend.averageScore)}/100 - Best: ${formatScore(friend.bestRound)} - ${friend.rounds} manches</li>`;
-        })
-        .join("")
-      : '<li class="score-empty">Aucun ami ajouté pour le moment.</li>';
-
-    const roomRows = lastLeaderboardEntries.length > 0
-      ? lastLeaderboardEntries
-        .map((entry) => `<li>${entry.name}: ${formatScore(entry.score)}/${lastLeaderboardMaxScore}</li>`)
-        .join("")
-      : '<li class="score-empty">Aucune partie online active.</li>';
-
-    const incomingRows = incomingFriendRequests.length > 0
-      ? incomingFriendRequests
-        .map((request) => `<li><strong>${request.username}</strong> (${toDateTimeLabel(request.createdAt)}) <button class="btn btn-ghost" data-friend-request-action="accept" data-request-id="${request.id}" type="button">Accepter</button> <button class="btn btn-ghost" data-friend-request-action="decline" data-request-id="${request.id}" type="button">Refuser</button></li>`)
-        .join("")
-      : '<li class="score-empty">Aucune demande recue.</li>';
-
-    const outgoingRows = outgoingFriendRequests.length > 0
-      ? outgoingFriendRequests
-        .map((request) => `<li><strong>${request.username}</strong> (${toDateTimeLabel(request.createdAt)})</li>`)
-        .join("")
-      : '<li class="score-empty">Aucune demande envoyee.</li>';
-
-    scorePageFriends.innerHTML = `
-      <div class="score-history-toolbar">
-        <input id="friendUsernameInput" type="text" maxlength="20" placeholder="Pseudo ami" />
-        <button id="friendAddBtn" class="btn btn-ghost" type="button">Envoyer demande</button>
-        <button id="friendRefreshBtn" class="btn btn-ghost" type="button">Actualiser</button>
-      </div>
-      <p id="friendsStatusText" class="score-empty">${friendsData.length} ami(s) connecte(s) a ton reseau.</p>
-      <p class="score-empty" style="margin-top:0.55rem;">Demandes recues</p>
-      <ol class="score-list">${incomingRows}</ol>
-      <p class="score-empty" style="margin-top:0.55rem;">Demandes envoyees</p>
-      <ol class="score-list">${outgoingRows}</ol>
-      <p class="score-empty" style="margin-top:0.55rem;">Mes amis</p>
-      <ol class="score-list">${friendRows}</ol>
-      <p class="score-empty" style="margin-top:0.55rem;">Snapshot du salon courant</p>
-      <ol class="score-list">${roomRows}</ol>
-    `;
-
-    const friendInput = document.getElementById("friendUsernameInput");
-    const friendAddBtn = document.getElementById("friendAddBtn");
-    const friendRefreshBtn = document.getElementById("friendRefreshBtn");
-    const friendsStatusText = document.getElementById("friendsStatusText");
-
-    if (friendsStatusText) {
-      const onlineCount = friendsData.filter((friend) => friend.isOnline).length;
-      friendsStatusText.textContent = `${friendsData.length} ami(s), ${onlineCount} en ligne.`;
-    }
-
-    if (friendAddBtn) {
-      friendAddBtn.addEventListener("click", async () => {
-        const username = friendInput?.value?.trim() || "";
-        if (!username) {
-          authStatus.textContent = "Entre un pseudo ami.";
-          return;
-        }
-        await addFriend(username);
-      });
-    }
-
-    const requestActionButtons = scorePageFriends.querySelectorAll("button[data-friend-request-action]");
-    for (const button of requestActionButtons) {
-      button.addEventListener("click", async () => {
-        const requestId = Number(button.getAttribute("data-request-id") || 0);
-        const action = button.getAttribute("data-friend-request-action") || "";
-        await respondToFriendRequest(requestId, action);
-      });
-    }
-
-    if (friendRefreshBtn) {
-      friendRefreshBtn.addEventListener("click", async () => {
-        await refreshFriendsData();
-      });
-    }
-  }
-
   const globalEntries = Array.isArray(persistedTracking?.global)
     ? persistedTracking.global
     : [];
@@ -2128,21 +2049,194 @@ function renderScorePages() {
   exportBtn.addEventListener("click", exportHistoryCsv);
 }
 
+function renderSocialPanel() {
+  if (!socialPage) {
+    return;
+  }
+
+  if (!authenticatedUser) {
+    socialPage.innerHTML = '<p class="score-empty">Connecte-toi pour acceder aux amis, invitations et messages.</p>';
+    return;
+  }
+
+  const incomingRequestRows = incomingFriendRequests.length > 0
+    ? incomingFriendRequests
+      .map((request) => `<li><strong>${request.username}</strong> (${toDateTimeLabel(request.createdAt)}) <button class="btn btn-ghost" data-friend-request-action="accept" data-request-id="${request.id}" type="button">Accepter</button> <button class="btn btn-ghost" data-friend-request-action="decline" data-request-id="${request.id}" type="button">Refuser</button></li>`)
+      .join("")
+    : '<li class="score-empty">Aucune demande recue.</li>';
+
+  const outgoingRequestRows = outgoingFriendRequests.length > 0
+    ? outgoingFriendRequests
+      .map((request) => `<li><strong>${request.username}</strong> (${toDateTimeLabel(request.createdAt)})</li>`)
+      .join("")
+    : '<li class="score-empty">Aucune demande envoyee.</li>';
+
+  const friendRows = friendsData.length > 0
+    ? friendsData
+      .map((friend) => {
+        const roomDetails = friend.currentRoomCode
+          ? ` (salon ${friend.currentRoomCode}${friend.isInMatch ? ", en partie" : ""})`
+          : "";
+        const status = friend.isOnline
+          ? `En ligne${roomDetails}`
+          : `Hors ligne (vu: ${getLastSeenLabel(friend.lastSeenAt)})`;
+        return `<li><strong>${friend.username}</strong> - ${status} <button class="btn btn-ghost" data-social-invite-user-id="${friend.id}" type="button">Inviter</button> <button class="btn btn-ghost" data-social-open-chat-user-id="${friend.id}" type="button">Message</button></li>`;
+      })
+      .join("")
+    : '<li class="score-empty">Aucun ami ajoute.</li>';
+
+  const incomingInviteRows = incomingSocialInvites.length > 0
+    ? incomingSocialInvites
+      .map((invite) => `<li><strong>${invite.fromUsername}</strong> t'invite dans ${invite.roomCode} (${toDateTimeLabel(invite.createdAt)}) <button class="btn btn-ghost" data-social-join-room="${invite.roomCode}" type="button">Rejoindre</button> <button class="btn btn-ghost" data-social-invite-action="decline" data-invite-id="${invite.id}" type="button">Ignorer</button></li>`)
+      .join("")
+    : '<li class="score-empty">Aucune invitation recue.</li>';
+
+  const outgoingInviteRows = outgoingSocialInvites.length > 0
+    ? outgoingSocialInvites
+      .map((invite) => `<li><strong>${invite.toUsername}</strong> - salon ${invite.roomCode} (${toDateTimeLabel(invite.createdAt)})</li>`)
+      .join("")
+    : '<li class="score-empty">Aucune invitation envoyee.</li>';
+
+  const onlineCount = friendsData.filter((friend) => friend.isOnline).length;
+  const selectedFriendId = socialSelectedFriendId || (friendsData[0]?.id ?? null);
+  const friendSelectOptions = friendsData
+    .map((friend) => `<option value="${friend.id}" ${Number(selectedFriendId) === Number(friend.id) ? "selected" : ""}>${friend.username}</option>`)
+    .join("");
+
+  const messageRows = socialMessages.length > 0
+    ? socialMessages
+      .map((entry) => `<li><strong>${entry.isMine ? "Moi" : entry.fromUsername}</strong>: ${entry.message} <span class="score-empty">(${toDateTimeLabel(entry.createdAt)})</span></li>`)
+      .join("")
+    : '<li class="score-empty">Aucun message pour cette conversation.</li>';
+
+  socialPage.innerHTML = `
+    <div class="score-history-toolbar">
+      <input id="friendUsernameInput" type="text" maxlength="20" placeholder="Pseudo ami" />
+      <button id="friendAddBtn" class="btn btn-ghost" type="button">Envoyer demande</button>
+      <button id="friendRefreshBtn" class="btn btn-ghost" type="button">Actualiser</button>
+    </div>
+    <p class="score-empty">${friendsData.length} ami(s), ${onlineCount} en ligne.</p>
+    <p class="score-empty" style="margin-top:0.55rem;">Demandes recues</p>
+    <ol class="score-list">${incomingRequestRows}</ol>
+    <p class="score-empty" style="margin-top:0.55rem;">Demandes envoyees</p>
+    <ol class="score-list">${outgoingRequestRows}</ol>
+    <p class="score-empty" style="margin-top:0.55rem;">Mes amis</p>
+    <ol class="score-list">${friendRows}</ol>
+    <p class="score-empty" style="margin-top:0.55rem;">Invitations recues</p>
+    <ol class="score-list">${incomingInviteRows}</ol>
+    <p class="score-empty" style="margin-top:0.55rem;">Invitations envoyees</p>
+    <ol class="score-list">${outgoingInviteRows}</ol>
+    <p class="score-empty" style="margin-top:0.55rem;">Messages prives</p>
+    <div class="score-history-toolbar">
+      <select id="socialMessageFriendSelect">${friendSelectOptions || "<option value=''>Aucun ami</option>"}</select>
+      <input id="socialMessageInput" type="text" maxlength="260" placeholder="Ecris un message" />
+      <button id="socialMessageSendBtn" class="btn btn-ghost" type="button">Envoyer</button>
+    </div>
+    <ol class="score-list">${messageRows}</ol>
+  `;
+
+  const friendInput = document.getElementById("friendUsernameInput");
+  const friendAddBtn = document.getElementById("friendAddBtn");
+  const friendRefreshBtn = document.getElementById("friendRefreshBtn");
+  const messageFriendSelect = document.getElementById("socialMessageFriendSelect");
+  const messageInput = document.getElementById("socialMessageInput");
+  const messageSendBtn = document.getElementById("socialMessageSendBtn");
+
+  if (friendAddBtn) {
+    friendAddBtn.addEventListener("click", async () => {
+      const username = friendInput?.value?.trim() || "";
+      if (!username) {
+        authStatus.textContent = "Entre un pseudo ami.";
+        return;
+      }
+      await addFriend(username);
+    });
+  }
+
+  if (friendRefreshBtn) {
+    friendRefreshBtn.addEventListener("click", async () => {
+      await refreshFriendsData();
+      await refreshSocialInvites();
+    });
+  }
+
+  if (messageFriendSelect) {
+    messageFriendSelect.addEventListener("change", async () => {
+      socialSelectedFriendId = Number(messageFriendSelect.value || 0) || null;
+      await refreshSocialMessages();
+    });
+  }
+
+  if (messageSendBtn) {
+    messageSendBtn.addEventListener("click", async () => {
+      const friendId = Number(messageFriendSelect?.value || 0);
+      const message = messageInput?.value?.trim() || "";
+      if (!friendId || !message) {
+        return;
+      }
+      await sendSocialMessage(friendId, message);
+      if (messageInput) {
+        messageInput.value = "";
+      }
+    });
+  }
+
+  const friendRequestButtons = socialPage.querySelectorAll("button[data-friend-request-action]");
+  for (const button of friendRequestButtons) {
+    button.addEventListener("click", async () => {
+      const requestId = Number(button.getAttribute("data-request-id") || 0);
+      const action = button.getAttribute("data-friend-request-action") || "";
+      await respondToFriendRequest(requestId, action);
+    });
+  }
+
+  const inviteFriendButtons = socialPage.querySelectorAll("button[data-social-invite-user-id]");
+  for (const button of inviteFriendButtons) {
+    button.addEventListener("click", async () => {
+      const friendId = Number(button.getAttribute("data-social-invite-user-id") || 0);
+      await sendSocialInvite(friendId);
+    });
+  }
+
+  const openChatButtons = socialPage.querySelectorAll("button[data-social-open-chat-user-id]");
+  for (const button of openChatButtons) {
+    button.addEventListener("click", async () => {
+      const friendId = Number(button.getAttribute("data-social-open-chat-user-id") || 0);
+      socialSelectedFriendId = friendId;
+      await refreshSocialMessages();
+    });
+  }
+
+  const joinRoomButtons = socialPage.querySelectorAll("button[data-social-join-room]");
+  for (const button of joinRoomButtons) {
+    button.addEventListener("click", () => {
+      const roomCode = String(button.getAttribute("data-social-join-room") || "").trim().toUpperCase();
+      if (!roomCode) {
+        return;
+      }
+      joinRoomFromSocial(roomCode);
+    });
+  }
+
+  const inviteActionButtons = socialPage.querySelectorAll("button[data-social-invite-action]");
+  for (const button of inviteActionButtons) {
+    button.addEventListener("click", async () => {
+      const inviteId = Number(button.getAttribute("data-invite-id") || 0);
+      const action = button.getAttribute("data-social-invite-action") || "";
+      await respondToSocialInvite(inviteId, action);
+    });
+  }
+}
+
 function setScorePage(nextPage) {
   scorePage = nextPage;
   scoreTabPersoBtn.classList.toggle("active", scorePage === "perso");
-  scoreTabFriendsBtn.classList.toggle("active", scorePage === "friends");
   scoreTabGlobalBtn.classList.toggle("active", scorePage === "global");
   scoreTabHistoryBtn.classList.toggle("active", scorePage === "history");
 
   scorePagePerso.classList.toggle("hidden", scorePage !== "perso");
-  scorePageFriends.classList.toggle("hidden", scorePage !== "friends");
   scorePageGlobal.classList.toggle("hidden", scorePage !== "global");
   scorePageHistory.classList.toggle("hidden", scorePage !== "history");
-
-  if (scorePage === "friends" && authenticatedUser) {
-    refreshFriendsData();
-  }
 }
 
 function closeScoreDrawer() {
@@ -2156,6 +2250,7 @@ function toggleScoreDrawer() {
   const shouldOpen = scoreDrawer.classList.contains("hidden");
   if (shouldOpen) {
     closeMenu();
+    closeSocialDrawer();
     renderScorePages();
   }
 
@@ -2164,6 +2259,38 @@ function toggleScoreDrawer() {
   trophyBtn.classList.toggle("open", shouldOpen);
   trophyBtn.setAttribute("aria-expanded", String(shouldOpen));
   pulseButton(trophyBtn);
+}
+
+function closeSocialDrawer() {
+  if (!socialDrawer || !socialBackdrop || !socialBtn) {
+    return;
+  }
+  socialDrawer.classList.add("hidden");
+  socialBackdrop.classList.add("hidden");
+  socialBtn.classList.remove("open");
+  socialBtn.setAttribute("aria-expanded", "false");
+}
+
+async function toggleSocialDrawer() {
+  if (!socialDrawer || !socialBackdrop || !socialBtn) {
+    return;
+  }
+
+  const shouldOpen = socialDrawer.classList.contains("hidden");
+  if (shouldOpen) {
+    closeMenu();
+    closeScoreDrawer();
+    await refreshFriendsData();
+    await refreshSocialInvites();
+    await refreshSocialMessages();
+    renderSocialPanel();
+  }
+
+  socialDrawer.classList.toggle("hidden", !shouldOpen);
+  socialBackdrop.classList.toggle("hidden", !shouldOpen);
+  socialBtn.classList.toggle("open", shouldOpen);
+  socialBtn.setAttribute("aria-expanded", String(shouldOpen));
+  pulseButton(socialBtn);
 }
 
 function updateMenuButtons() {
@@ -2503,6 +2630,7 @@ async function refreshFriendsData() {
     incomingFriendRequests = [];
     outgoingFriendRequests = [];
     renderScorePages();
+    renderSocialPanel();
     return;
   }
 
@@ -2515,6 +2643,7 @@ async function refreshFriendsData() {
       incomingFriendRequests = [];
       outgoingFriendRequests = [];
       renderScorePages();
+      renderSocialPanel();
       return;
     }
 
@@ -2537,12 +2666,160 @@ async function refreshFriendsData() {
 
     hasHydratedFriendsPresence = true;
     renderScorePages();
+    renderSocialPanel();
   } catch {
     friendsData = [];
     incomingFriendRequests = [];
     outgoingFriendRequests = [];
     renderScorePages();
+    renderSocialPanel();
   }
+}
+
+async function refreshSocialInvites() {
+  if (!authenticatedUser) {
+    incomingSocialInvites = [];
+    outgoingSocialInvites = [];
+    renderSocialPanel();
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/social/invites");
+    const data = await response.json();
+    if (!response.ok || !data.ok) {
+      incomingSocialInvites = [];
+      outgoingSocialInvites = [];
+      renderSocialPanel();
+      return;
+    }
+
+    incomingSocialInvites = Array.isArray(data.incomingInvites) ? data.incomingInvites : [];
+    outgoingSocialInvites = Array.isArray(data.outgoingInvites) ? data.outgoingInvites : [];
+    renderSocialPanel();
+  } catch {
+    incomingSocialInvites = [];
+    outgoingSocialInvites = [];
+    renderSocialPanel();
+  }
+}
+
+async function refreshSocialMessages() {
+  if (!authenticatedUser || !socialSelectedFriendId) {
+    socialMessages = [];
+    renderSocialPanel();
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/social/messages/${socialSelectedFriendId}`);
+    const data = await response.json();
+    if (!response.ok || !data.ok) {
+      socialMessages = [];
+      renderSocialPanel();
+      return;
+    }
+
+    socialMessages = Array.isArray(data.messages) ? data.messages : [];
+    renderSocialPanel();
+  } catch {
+    socialMessages = [];
+    renderSocialPanel();
+  }
+}
+
+async function sendSocialInvite(friendUserId) {
+  if (!authenticatedUser) {
+    authStatus.textContent = "Connecte-toi pour inviter un ami.";
+    return;
+  }
+
+  const roomCode = currentRoomCode || roomCodeInput.value.trim().toUpperCase();
+  if (!roomCode) {
+    setOnlineStatus("Cree ou rejoins un salon avant d'inviter un ami.");
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/social/invite", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ friendUserId, roomCode }),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) {
+      throw new Error(data.message || "Invitation impossible.");
+    }
+
+    setOnlineStatus(`Invitation envoyee vers le salon ${roomCode}.`);
+    await refreshSocialInvites();
+  } catch (error) {
+    setOnlineStatus(error.message || "Erreur envoi invitation.");
+  }
+}
+
+async function respondToSocialInvite(inviteId, action) {
+  if (!authenticatedUser) {
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/social/invites/respond", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ inviteId, action }),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) {
+      throw new Error(data.message || "Action invitation impossible.");
+    }
+
+    await refreshSocialInvites();
+  } catch (error) {
+    setOnlineStatus(error.message || "Erreur invitation.");
+  }
+}
+
+async function sendSocialMessage(friendUserId, message) {
+  if (!authenticatedUser) {
+    authStatus.textContent = "Connecte-toi pour envoyer un message.";
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/social/message", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ friendUserId, message }),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) {
+      throw new Error(data.message || "Message impossible.");
+    }
+
+    await refreshSocialMessages();
+  } catch (error) {
+    authStatus.textContent = error.message || "Erreur envoi message.";
+  }
+}
+
+function joinRoomFromSocial(roomCode) {
+  if (!socket) {
+    setOnlineStatus("Serveur online indisponible.");
+    return;
+  }
+
+  if (appView !== "game") {
+    appView = "game";
+    updateAppView();
+  }
+
+  setGameMode("online");
+  socket.emit("join_room", {
+    roomCode,
+    name: getPlayerName(),
+  });
+  setOnlineStatus(`Tentative de connexion au salon ${roomCode}...`);
 }
 
 async function addFriend(username) {
@@ -2631,6 +2908,10 @@ function setAuthenticatedUser(user) {
     friendsData = [];
     incomingFriendRequests = [];
     outgoingFriendRequests = [];
+    incomingSocialInvites = [];
+    outgoingSocialInvites = [];
+    socialMessages = [];
+    socialSelectedFriendId = null;
     hasHydratedFriendsPresence = false;
     stopFriendsPolling();
   }
@@ -2675,6 +2956,7 @@ async function refreshAuthSession() {
     if (data.user) {
       await refreshPersistedTracking();
       await refreshFriendsData();
+      await refreshSocialInvites();
     }
   } catch {
     setAuthenticatedUser(null);
@@ -3076,6 +3358,7 @@ submitBtn.addEventListener("click", scoreGuess);
 
 burgerBtn.addEventListener("click", toggleMenu);
 trophyBtn.addEventListener("click", toggleScoreDrawer);
+socialBtn.addEventListener("click", toggleSocialDrawer);
 brandTitle.addEventListener("click", toggleBrandTitle);
 brandTitle.addEventListener("keydown", (event) => {
   if (event.key === "Enter" || event.key === " ") {
@@ -3087,9 +3370,10 @@ menuBackdrop.addEventListener("click", closeMenu);
 menuCloseBtn.addEventListener("click", closeMenu);
 scoreBackdrop.addEventListener("click", closeScoreDrawer);
 scoreCloseBtn.addEventListener("click", closeScoreDrawer);
+socialBackdrop.addEventListener("click", closeSocialDrawer);
+socialCloseBtn.addEventListener("click", closeSocialDrawer);
 
 scoreTabPersoBtn.addEventListener("click", () => setScorePage("perso"));
-scoreTabFriendsBtn.addEventListener("click", () => setScorePage("friends"));
 scoreTabGlobalBtn.addEventListener("click", () => setScorePage("global"));
 scoreTabHistoryBtn.addEventListener("click", () => setScorePage("history"));
 
@@ -3103,6 +3387,7 @@ registerBtn.addEventListener("click", async () => {
     setAuthenticatedUser(data.user);
     await refreshPersistedTracking();
     await refreshFriendsData();
+    await refreshSocialInvites();
   } catch (error) {
     authStatus.textContent = error.message;
   }
@@ -3118,6 +3403,7 @@ loginBtn.addEventListener("click", async () => {
     setAuthenticatedUser(data.user);
     await refreshPersistedTracking();
     await refreshFriendsData();
+    await refreshSocialInvites();
   } catch (error) {
     authStatus.textContent = error.message;
   }
@@ -3138,6 +3424,7 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     closeMenu();
     closeScoreDrawer();
+    closeSocialDrawer();
   }
 });
 

@@ -118,7 +118,7 @@ body[data-theme="code"] {
 
 .trophy-btn {
   position: absolute;
-  right: 7.2rem;
+  right: 14.1rem;
   top: 0;
   display: inline-flex;
   align-items: center;
@@ -143,6 +143,40 @@ body[data-theme="code"] {
 .trophy-btn.open {
   background: linear-gradient(120deg, var(--accent), var(--accent-2));
   color: #fff;
+}
+
+.social-btn {
+  position: absolute;
+  right: 7.2rem;
+  top: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid rgba(31, 27, 22, 0.12);
+  border-radius: 999px;
+  padding: 0.55rem 0.85rem;
+  background: rgba(255, 255, 255, 0.82);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  z-index: 35;
+  box-shadow: 0 10px 24px rgba(31, 27, 22, 0.08);
+  transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+.social-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 28px rgba(31, 27, 22, 0.12);
+}
+
+.social-btn.open {
+  background: linear-gradient(120deg, #197278, #2a9d8f);
+  color: #fff;
+}
+
+.social-icon {
+  font-size: 1.05rem;
+  line-height: 1;
 }
 
 .trophy-icon {
@@ -228,9 +262,26 @@ body[data-theme="code"] {
   animation: menu-drop 180ms ease-out;
 }
 
+.social-drawer {
+  position: fixed;
+  top: 4.6rem;
+  right: 1.1rem;
+  width: min(430px, calc(100vw - 2.2rem));
+  max-height: calc(100vh - 6rem);
+  overflow: auto;
+  border: 1px solid rgba(31, 27, 22, 0.12);
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(244, 252, 251, 0.98), rgba(231, 246, 244, 0.96));
+  padding: 1rem;
+  box-shadow: 0 24px 60px rgba(31, 27, 22, 0.18);
+  z-index: 31;
+  transform-origin: top right;
+  animation: menu-drop 180ms ease-out;
+}
+
 .score-tab-switch {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.35rem;
   width: 100%;
   margin: 0.3rem 0 0.85rem;
@@ -330,6 +381,15 @@ body[data-theme="code"] {
 }
 
 .score-history-toolbar input {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.86);
+  padding: 0.45rem 0.55rem;
+  font: inherit;
+  min-width: 160px;
+}
+
+.score-history-toolbar select {
   border: 1px solid var(--line);
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.86);

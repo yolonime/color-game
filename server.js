@@ -151,6 +151,33 @@ db.prepare(
   )`,
 ).run();
 
+db.prepare(
+  `CREATE TABLE IF NOT EXISTS user_social_invites (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    from_user_id INTEGER NOT NULL,
+    to_user_id INTEGER NOT NULL,
+    room_code TEXT NOT NULL,
+    message TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    created_at INTEGER NOT NULL,
+    responded_at INTEGER,
+    FOREIGN KEY (from_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (to_user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`,
+).run();
+
+db.prepare(
+  `CREATE TABLE IF NOT EXISTS user_direct_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    from_user_id INTEGER NOT NULL,
+    to_user_id INTEGER NOT NULL,
+    message TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY (from_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (to_user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`,
+).run();
+
 db.prepare("CREATE INDEX IF NOT EXISTS idx_round_history_user_created ON user_round_history (user_id, created_at DESC)").run();
 db.prepare("CREATE INDEX IF NOT EXISTS idx_match_history_user_created ON user_match_history (user_id, created_at DESC)").run();
 db.prepare("CREATE INDEX IF NOT EXISTS idx_activity_log_user_created ON user_activity_log (user_id, created_at DESC)").run();
@@ -158,6 +185,9 @@ db.prepare("CREATE INDEX IF NOT EXISTS idx_sessions_expires ON user_sessions (ex
 db.prepare("CREATE INDEX IF NOT EXISTS idx_user_friends_friend ON user_friends (friend_user_id)").run();
 db.prepare("CREATE INDEX IF NOT EXISTS idx_friend_requests_recipient ON user_friend_requests (recipient_user_id, status)").run();
 db.prepare("CREATE INDEX IF NOT EXISTS idx_friend_requests_requester ON user_friend_requests (requester_user_id, status)").run();
+db.prepare("CREATE INDEX IF NOT EXISTS idx_social_invites_to_user ON user_social_invites (to_user_id, status, created_at DESC)").run();
+db.prepare("CREATE INDEX IF NOT EXISTS idx_social_invites_from_user ON user_social_invites (from_user_id, status, created_at DESC)").run();
+db.prepare("CREATE INDEX IF NOT EXISTS idx_direct_messages_users ON user_direct_messages (from_user_id, to_user_id, created_at DESC)").run();
 
 const authSessions = new Map();
 const activeUsers = new Map();
@@ -215,6 +245,51 @@ const getIncomingFriendRequestByIdStmt = db.prepare(
 );
 const updateFriendRequestStatusStmt = db.prepare(
   "UPDATE user_friend_requests SET status = ?, responded_at = ? WHERE id = ?",
+);
+const insertSocialInviteStmt = db.prepare(
+  `INSERT INTO user_social_invites (from_user_id, to_user_id, room_code, message, status, created_at)
+   VALUES (?, ?, ?, ?, 'pending', ?)`,
+);
+const getIncomingSocialInvitesStmt = db.prepare(
+  `SELECT i.id, i.room_code AS roomCode, i.message, i.created_at AS createdAt,
+          u.id AS fromUserId, u.username AS fromUsername
+   FROM user_social_invites i
+   JOIN users u ON u.id = i.from_user_id
+   WHERE i.to_user_id = ? AND i.status = 'pending'
+   ORDER BY i.created_at DESC
+   LIMIT 30`,
+);
+const getOutgoingSocialInvitesStmt = db.prepare(
+  `SELECT i.id, i.room_code AS roomCode, i.message, i.created_at AS createdAt,
+          u.id AS toUserId, u.username AS toUsername
+   FROM user_social_invites i
+   JOIN users u ON u.id = i.to_user_id
+   WHERE i.from_user_id = ? AND i.status = 'pending'
+   ORDER BY i.created_at DESC
+   LIMIT 30`,
+);
+const getIncomingSocialInviteByIdStmt = db.prepare(
+  `SELECT id, from_user_id AS fromUserId, to_user_id AS toUserId
+   FROM user_social_invites
+   WHERE id = ? AND to_user_id = ? AND status = 'pending'`,
+);
+const updateSocialInviteStatusStmt = db.prepare(
+  "UPDATE user_social_invites SET status = ?, responded_at = ? WHERE id = ?",
+);
+const insertDirectMessageStmt = db.prepare(
+  `INSERT INTO user_direct_messages (from_user_id, to_user_id, message, created_at)
+   VALUES (?, ?, ?, ?)`,
+);
+const getDirectMessagesBetweenStmt = db.prepare(
+  `SELECT m.id, m.from_user_id AS fromUserId, m.to_user_id AS toUserId,
+          m.message, m.created_at AS createdAt,
+          uf.username AS fromUsername, ut.username AS toUsername
+   FROM user_direct_messages m
+   JOIN users uf ON uf.id = m.from_user_id
+   JOIN users ut ON ut.id = m.to_user_id
+   WHERE (m.from_user_id = ? AND m.to_user_id = ?) OR (m.from_user_id = ? AND m.to_user_id = ?)
+   ORDER BY m.created_at DESC
+   LIMIT 60`,
 );
 const getFriendsStmt = db.prepare(
   `SELECT u.id, u.username,
@@ -376,6 +451,13 @@ function getUserPresence(userId) {
   }
 
   return presence;
+}
+
+function areUsersFriends(userId, otherUserId) {
+  if (!userId || !otherUserId) {
+    return false;
+  }
+  return !!areFriendsStmt.get(userId, otherUserId);
 }
 
 function recordRoundHistory(userId, payload) {
@@ -1012,6 +1094,136 @@ app.post("/api/friends/respond", requireAuth, (req, res) => {
   logUserActivity(userId, action === "accept" ? "friend_request_accepted" : "friend_request_declined", {
     requestId,
     requesterUserId: request.requesterUserId,
+  });
+
+  res.json({ ok: true });
+});
+
+app.get("/api/social/invites", requireAuth, (req, res) => {
+  const { userId } = req.authSession;
+  const incomingInvites = getIncomingSocialInvitesStmt.all(userId).map((invite) => ({
+    id: Number(invite.id),
+    roomCode: String(invite.roomCode || "").toUpperCase(),
+    message: invite.message || "",
+    createdAt: Number(invite.createdAt),
+    fromUserId: Number(invite.fromUserId),
+    fromUsername: invite.fromUsername,
+  }));
+
+  const outgoingInvites = getOutgoingSocialInvitesStmt.all(userId).map((invite) => ({
+    id: Number(invite.id),
+    roomCode: String(invite.roomCode || "").toUpperCase(),
+    message: invite.message || "",
+    createdAt: Number(invite.createdAt),
+    toUserId: Number(invite.toUserId),
+    toUsername: invite.toUsername,
+  }));
+
+  res.json({ ok: true, incomingInvites, outgoingInvites });
+});
+
+app.post("/api/social/invite", requireAuth, (req, res) => {
+  const { userId } = req.authSession;
+  const friendUserId = Number(req.body?.friendUserId || 0);
+  const roomCode = String(req.body?.roomCode || "").trim().toUpperCase();
+  const message = String(req.body?.message || "").trim().slice(0, 180);
+
+  if (!friendUserId || !roomCode) {
+    res.status(400).json({ ok: false, message: "Invitation invalide." });
+    return;
+  }
+
+  if (!areUsersFriends(userId, friendUserId)) {
+    res.status(403).json({ ok: false, message: "Tu peux inviter uniquement tes amis." });
+    return;
+  }
+
+  const now = Date.now();
+  insertSocialInviteStmt.run(userId, friendUserId, roomCode, message || null, now);
+
+  logUserActivity(userId, "social_invite_sent", {
+    friendUserId,
+    roomCode,
+  });
+
+  res.json({ ok: true });
+});
+
+app.post("/api/social/invites/respond", requireAuth, (req, res) => {
+  const { userId } = req.authSession;
+  const inviteId = Number(req.body?.inviteId || 0);
+  const action = String(req.body?.action || "").trim().toLowerCase();
+
+  if (!inviteId || !["accept", "decline"].includes(action)) {
+    res.status(400).json({ ok: false, message: "Action invitation invalide." });
+    return;
+  }
+
+  const invite = getIncomingSocialInviteByIdStmt.get(inviteId, userId);
+  if (!invite) {
+    res.status(404).json({ ok: false, message: "Invitation introuvable ou deja traitee." });
+    return;
+  }
+
+  updateSocialInviteStatusStmt.run(action === "accept" ? "accepted" : "declined", Date.now(), inviteId);
+
+  logUserActivity(userId, action === "accept" ? "social_invite_accepted" : "social_invite_declined", {
+    inviteId,
+    fromUserId: invite.fromUserId,
+  });
+
+  res.json({ ok: true });
+});
+
+app.get("/api/social/messages/:friendUserId", requireAuth, (req, res) => {
+  const { userId } = req.authSession;
+  const friendUserId = Number(req.params.friendUserId || 0);
+
+  if (!friendUserId) {
+    res.status(400).json({ ok: false, message: "Conversation invalide." });
+    return;
+  }
+
+  if (!areUsersFriends(userId, friendUserId)) {
+    res.status(403).json({ ok: false, message: "Cette conversation n'est pas autorisee." });
+    return;
+  }
+
+  const messages = getDirectMessagesBetweenStmt
+    .all(userId, friendUserId, friendUserId, userId)
+    .reverse()
+    .map((entry) => ({
+      id: Number(entry.id),
+      fromUserId: Number(entry.fromUserId),
+      toUserId: Number(entry.toUserId),
+      fromUsername: entry.fromUsername,
+      toUsername: entry.toUsername,
+      message: entry.message,
+      createdAt: Number(entry.createdAt),
+      isMine: Number(entry.fromUserId) === Number(userId),
+    }));
+
+  res.json({ ok: true, messages });
+});
+
+app.post("/api/social/message", requireAuth, (req, res) => {
+  const { userId } = req.authSession;
+  const friendUserId = Number(req.body?.friendUserId || 0);
+  const message = String(req.body?.message || "").trim().slice(0, 260);
+
+  if (!friendUserId || !message) {
+    res.status(400).json({ ok: false, message: "Message invalide." });
+    return;
+  }
+
+  if (!areUsersFriends(userId, friendUserId)) {
+    res.status(403).json({ ok: false, message: "Tu peux ecrire uniquement a tes amis." });
+    return;
+  }
+
+  insertDirectMessageStmt.run(userId, friendUserId, message, Date.now());
+  logUserActivity(userId, "direct_message_sent", {
+    friendUserId,
   });
 
   res.json({ ok: true });
