@@ -2,6 +2,11 @@ const SHOW_DURATION_SECONDS = 5;
 const FIXED_LIGHTNESS = 50;
 const MATCH_ROUNDS = 5;
 const NEXT_ROUND_DELAY_MS = 1400;
+const ONLINE_MODE_LABELS = window.ColorGuesser?.Constants?.ONLINE_MODE_LABELS || {
+  memory: "Mémoire",
+  name: "Nom couleur",
+  code: "Mode code",
+};
 
 const stageColor = document.getElementById("stageColor");
 const stageOverlay = document.getElementById("stageOverlay");

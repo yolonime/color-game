@@ -483,7 +483,7 @@ app.post("/api/auth/login", (req, res) => {
 });
 
 app.get("/api/auth/me", (req, res) => {
-  const session = getSessionFromRequest(req);
+  const session = getSessionFromRequest(req, authSessions);
   if (!session) {
     res.json({ ok: true, user: null });
     return;
@@ -493,7 +493,7 @@ app.get("/api/auth/me", (req, res) => {
 });
 
 app.post("/api/auth/logout", (req, res) => {
-  const session = getSessionFromRequest(req);
+  const session = getSessionFromRequest(req, authSessions);
   if (session) {
     authSessions.delete(session.token);
   }
