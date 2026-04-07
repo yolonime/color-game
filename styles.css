@@ -682,6 +682,8 @@ body[data-theme="online"] .menu-drawer {
 
 .online-panel {
   margin-bottom: 1rem;
+  max-height: 58vh;
+  overflow-y: auto;
 }
 
 .online-grid {
@@ -695,6 +697,47 @@ body[data-theme="online"] .menu-drawer {
   border-radius: 18px;
   background: rgba(255, 251, 242, 0.72);
   padding: 1rem;
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 0.55rem;
+}
+
+.section-head-chat {
+  margin-top: 0.85rem;
+}
+
+.section-head h2 {
+  margin: 0;
+}
+
+.section-toggle {
+  border: 1px solid rgba(31, 27, 22, 0.18);
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--ink-soft);
+  border-radius: 999px;
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.78rem;
+  padding: 0.22rem 0.68rem;
+  cursor: pointer;
+}
+
+.collapsible-body {
+  max-height: 520px;
+  overflow-y: auto;
+  transition: max-height 200ms ease, opacity 180ms ease;
+  opacity: 1;
+}
+
+.collapsible-body.is-collapsed {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
 }
 
 .online-card h2 {
@@ -1240,6 +1283,8 @@ body[data-theme="online"] .menu-drawer {
 .result {
   margin-top: 1rem;
   animation: pop-in 260ms ease-out;
+  max-height: 56vh;
+  overflow-y: auto;
 }
 
 .converter-card {

@@ -116,6 +116,12 @@ const leaderboardList = document.getElementById("leaderboardList");
 const roomChatMessages = document.getElementById("roomChatMessages");
 const roomChatInput = document.getElementById("roomChatInput");
 const roomChatSendBtn = document.getElementById("roomChatSendBtn");
+const salonSectionToggleBtn = document.getElementById("salonSectionToggleBtn");
+const salonSectionBody = document.getElementById("salonSectionBody");
+const chatSectionToggleBtn = document.getElementById("chatSectionToggleBtn");
+const chatSectionBody = document.getElementById("chatSectionBody");
+const resultSectionToggleBtn = document.getElementById("resultSectionToggleBtn");
+const resultSectionBody = document.getElementById("resultSectionBody");
 const converterColorPicker = document.getElementById("converterColorPicker");
 const converterPreviewSwatch = document.getElementById("converterPreviewSwatch");
 const converterHueSlider = document.getElementById("converterHueSlider");
@@ -1330,6 +1336,33 @@ function pulseButton(button) {
   void button.offsetWidth;
   button.classList.add("pulse");
   setTimeout(() => button.classList.remove("pulse"), 240);
+}
+
+function setSectionCollapsed(toggleBtn, sectionBody, collapsed) {
+  if (!toggleBtn || !sectionBody) {
+    return;
+  }
+
+  sectionBody.classList.toggle("is-collapsed", collapsed);
+  toggleBtn.setAttribute("aria-expanded", String(!collapsed));
+  toggleBtn.textContent = collapsed ? "Ouvrir" : "Reduire";
+}
+
+function bindCollapsibleSection(toggleBtn, sectionBody) {
+  if (!toggleBtn || !sectionBody) {
+    return;
+  }
+
+  toggleBtn.addEventListener("click", () => {
+    const collapsed = sectionBody.classList.contains("is-collapsed");
+    setSectionCollapsed(toggleBtn, sectionBody, !collapsed);
+  });
+}
+
+function initCollapsibleSections() {
+  bindCollapsibleSection(salonSectionToggleBtn, salonSectionBody);
+  bindCollapsibleSection(chatSectionToggleBtn, chatSectionBody);
+  bindCollapsibleSection(resultSectionToggleBtn, resultSectionBody);
 }
 
 function setTheme() {
@@ -2683,6 +2716,7 @@ setNameModeDifficulty("normal");
 // Initialise l'app une fois que les données de couleurs sont chargées
 (async () => {
   await loadNamedColorData();
+  initCollapsibleSections();
   
   setCodeModeFormat("auto");
   setScorePage("perso");

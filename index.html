@@ -182,7 +182,11 @@
     <section id="onlinePanel" class="online-panel hidden" aria-live="polite">
       <div class="online-grid">
         <div class="online-card">
-          <h2>Salon</h2>
+          <div class="section-head">
+            <h2>Salon</h2>
+            <button id="salonSectionToggleBtn" class="section-toggle" type="button" aria-expanded="true" aria-controls="salonSectionBody">Reduire</button>
+          </div>
+          <div id="salonSectionBody" class="collapsible-body">
           <div class="online-mode-section">
             <p class="menu-section-title">Mode en ligne</p>
             <div class="mode-switch" aria-label="Choix du mode en ligne">
@@ -217,6 +221,7 @@
           <p id="onlineStatus" class="online-status">Connecte-toi a un salon pour jouer en ligne.</p>
           <p id="roomInfo" class="room-info"></p>
           <button id="copyRoomCodeBtn" class="btn btn-ghost hidden" type="button">Copier le code du salon</button>
+          </div>
         </div>
 
         <div class="online-card">
@@ -224,11 +229,16 @@
           <ul id="playersList" class="players-list"></ul>
           <h2>Classement</h2>
           <ol id="leaderboardList" class="leaderboard-list"></ol>
-          <h2>Chat du salon</h2>
-          <ul id="roomChatMessages" class="room-chat-list" aria-live="polite"></ul>
-          <div class="room-chat-compose">
-            <input id="roomChatInput" type="text" maxlength="220" placeholder="Ecris un message au salon" />
-            <button id="roomChatSendBtn" class="btn btn-ghost" type="button">Envoyer</button>
+          <div class="section-head section-head-chat">
+            <h2>Chat du salon</h2>
+            <button id="chatSectionToggleBtn" class="section-toggle" type="button" aria-expanded="false" aria-controls="chatSectionBody">Ouvrir</button>
+          </div>
+          <div id="chatSectionBody" class="collapsible-body is-collapsed">
+            <ul id="roomChatMessages" class="room-chat-list" aria-live="polite"></ul>
+            <div class="room-chat-compose">
+              <input id="roomChatInput" type="text" maxlength="220" placeholder="Ecris un message au salon" />
+              <button id="roomChatSendBtn" class="btn btn-ghost" type="button">Envoyer</button>
+            </div>
           </div>
         </div>
       </div>
@@ -373,24 +383,29 @@
     </section>
 
     <section id="result" class="result hidden" aria-live="polite">
-      <h2>Resultat</h2>
-      <p id="colorNameText" class="color-name-text hidden"></p>
-      <p id="scoreText" class="score-text"></p>
-      <div class="round-history-block">
-        <p class="compare-label">Recap des 5 manches</p>
-        <ol id="roundHistoryList" class="round-history-list"></ol>
+      <div class="section-head">
+        <h2>Resultat</h2>
+        <button id="resultSectionToggleBtn" class="section-toggle" type="button" aria-expanded="false" aria-controls="resultSectionBody">Ouvrir</button>
       </div>
-      <div class="compare-grid">
-        <div>
-          <p id="targetLabel" class="compare-label">Couleur cible</p>
-          <div id="targetSwatch" class="swatch"></div>
+      <div id="resultSectionBody" class="collapsible-body is-collapsed">
+        <p id="colorNameText" class="color-name-text hidden"></p>
+        <p id="scoreText" class="score-text"></p>
+        <div class="round-history-block">
+          <p class="compare-label">Recap des 5 manches</p>
+          <ol id="roundHistoryList" class="round-history-list"></ol>
         </div>
-        <div>
-          <p id="guessLabel" class="compare-label">Votre choix</p>
-          <div id="guessSwatch" class="swatch"></div>
+        <div class="compare-grid">
+          <div>
+            <p id="targetLabel" class="compare-label">Couleur cible</p>
+            <div id="targetSwatch" class="swatch"></div>
+          </div>
+          <div>
+            <p id="guessLabel" class="compare-label">Votre choix</p>
+            <div id="guessSwatch" class="swatch"></div>
+          </div>
         </div>
+        <p id="detailText" class="detail-text"></p>
       </div>
-      <p id="detailText" class="detail-text"></p>
     </section>
   </main>
 
